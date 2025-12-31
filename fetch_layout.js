@@ -16,7 +16,17 @@ async function fetchLayout() {
       JSON.stringify(response.data, null, 2)
     );
   } catch (error) {
-    console.error("Error:", error.message);
+    if (error.response) {
+      console.error("Local Server Status:", error.response.status);
+      console.error(
+        "Local Server Data:",
+        typeof error.response.data === "string"
+          ? error.response.data.substring(0, 200)
+          : error.response.data
+      );
+    } else {
+      console.error("Error:", error.message);
+    }
   }
 }
 

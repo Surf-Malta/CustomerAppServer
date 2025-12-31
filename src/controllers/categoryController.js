@@ -19,6 +19,8 @@ exports.getCategories = async (req, res) => {
         Accept: "application/json, text/plain, */*",
         "Accept-Language": "en-US,en;q=0.9",
         Connection: "keep-alive",
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: apiUrl.split("/api")[0] || apiUrl,
       },
     });
 

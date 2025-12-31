@@ -29,6 +29,8 @@ exports.loginWithEmail = async (req, res) => {
         Accept: "application/json, text/plain, */*",
         "Accept-Language": "en-US,en;q=0.9",
         Connection: "keep-alive",
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: configPost.url.split("/api")[0] || configPost.url,
       },
       data: JSON.stringify({
         destination: email,
