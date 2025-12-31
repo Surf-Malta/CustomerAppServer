@@ -1,15 +1,18 @@
 const axios = require("axios");
+const config = require("../config/config");
 
 exports.getOrders = async (req, res) => {
   try {
     const { user_id = 128 } = req.query; // Default to 128 as requested
+    const { csCartApi } = config;
 
     // Construct the external API URL
-    const apiUrl = `https://dev.surf.mt/api/2.0/NtOrdersApi?user_id=${user_id}`;
+    const apiUrl = `${csCartApi.baseUrl}/NtOrdersApi?user_id=${user_id}`;
 
     // Basic Auth Header
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {
@@ -38,11 +41,13 @@ exports.getOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { user_id = 128 } = req.query;
+    const { csCartApi } = config;
 
-    const apiUrl = `https://dev.surf.mt/api/2.0/NtOrdersApi/${orderId}?user_id=${user_id}`;
+    const apiUrl = `${csCartApi.baseUrl}/NtOrdersApi/${orderId}?user_id=${user_id}`;
 
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {

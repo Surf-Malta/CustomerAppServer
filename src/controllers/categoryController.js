@@ -1,10 +1,14 @@
 const axios = require("axios");
+const config = require("../config/config");
 
 exports.getCategories = async (req, res) => {
   try {
-    const apiUrl = "https://dev.surf.mt/api/2.0/NtCategoriesApi";
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const { csCartApi } = config;
+    const apiUrl = `${csCartApi.baseUrl}/NtCategoriesApi`;
+
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {

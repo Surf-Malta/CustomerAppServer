@@ -1,20 +1,19 @@
 const axios = require("axios");
+const config = require("../config/config");
 
 exports.getHomeLayout = async (req, res) => {
   try {
-    const { image_width } = req.query;
-    // Hardcoded user_id as per instructions
-    const user_id = 2;
+    const { image_width, user_id = 2 } = req.query;
+    const { csCartApi } = config;
 
     // Construct the external API URL
-    const apiUrl = `https://dev.surf.mt/api/2.0/NtHomepageLayoutApi?image_width=${
+    const apiUrl = `${csCartApi.baseUrl}/NtHomepageLayoutApi?image_width=${
       image_width || 20
     }&user_id=${user_id}`;
 
-    // Basic Auth matching the curl command provided
-    // Authorization: Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {

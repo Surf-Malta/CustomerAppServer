@@ -1,8 +1,10 @@
 const axios = require("axios");
+const config = require("../config/config");
 
 exports.loginWithEmail = async (req, res) => {
   try {
     const { email } = req.body;
+    const { csCartApi } = config;
 
     if (!email) {
       return res.status(400).json({
@@ -11,14 +13,17 @@ exports.loginWithEmail = async (req, res) => {
       });
     }
 
-    const config = {
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`
+    ).toString("base64")}`;
+
+    const configPost = {
       method: "post",
       maxBodyLength: Infinity,
-      url: "https://dev.surf.mt/api/2.0/NtOtpLoginApi",
+      url: `${csCartApi.baseUrl}/NtOtpLoginApi`,
       headers: {
         "Content-Type": "application/json",
-        Authorization:
-          "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==",
+        Authorization: authHeader,
       },
       data: JSON.stringify({
         destination: email,
@@ -26,7 +31,7 @@ exports.loginWithEmail = async (req, res) => {
       }),
     };
 
-    const response = await axios.request(config);
+    const response = await axios.request(configPost);
 
     // Forward the successful response from the external API
     res.status(200).json(response.data);
