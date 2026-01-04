@@ -12,10 +12,20 @@ const authRoutes = require("./auth.routes");
 const layoutRoutes = require("./layout.routes");
 const orderRoutes = require("./order.routes");
 const categoryRoutes = require("./category.routes");
+const brandRoutes = require("./brand.routes");
+const vendorRoutes = require("./vendor.routes");
+const productRoutes = require("./product.routes");
+const wishlistRoutes = require("./wishlist.routes");
+const cartRoutes = require("./cart.routes");
 
 router.use("/auth", authRoutes);
 router.use("/layout", layoutRoutes);
 router.use("/categories", categoryRoutes);
+router.use("/brands", brandRoutes);
+router.use("/vendors", vendorRoutes);
+router.use("/products", productRoutes);
+router.use("/wishlist", wishlistRoutes);
+router.use("/cart", cartRoutes);
 router.use("/", orderRoutes);
 
 module.exports = router;
