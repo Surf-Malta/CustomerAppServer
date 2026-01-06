@@ -4,22 +4,27 @@ const config = require("../config/config");
 exports.getProducts = async (req, res) => {
   try {
     const { csCartApi } = config;
-    const { company_id, user_id } = req.query;
+    const { company_id, variant_id, user_id } = req.query;
 
-    if (!company_id) {
+    if (!company_id && !variant_id) {
       return res.status(400).json({
         status: "error",
-        message: "company_id is required",
+        message: "company_id or variant_id is required",
       });
     }
 
-    const apiUrl = `${csCartApi.baseUrl}/NtProductApi?user_id=${
-      user_id || 128
-    }&company_id=${company_id}`;
+    let apiUrl = `${csCartApi.baseUrl}/NtProductApi?user_id=${user_id || 128}`;
 
-    const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
-    ).toString("base64")}`;
+    if (company_id) {
+      apiUrl += `&company_id=${company_id}`;
+    }
+
+    if (variant_id) {
+      apiUrl += `&variant_id=${variant_id}`;
+    }
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
 
     const response = await axios.get(apiUrl, {
       headers: {
@@ -28,19 +33,6 @@ exports.getProducts = async (req, res) => {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        Connection: "keep-alive",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "Sec-Ch-Ua":
-          '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "cross-site",
-        "X-Requested-With": "XMLHttpRequest",
       },
     });
 
