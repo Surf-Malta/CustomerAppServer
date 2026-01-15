@@ -18,6 +18,7 @@ const productRoutes = require("./product.routes");
 const wishlistRoutes = require("./wishlist.routes");
 const cartRoutes = require("./cart.routes");
 const configRoutes = require("./config.routes");
+const userRoutes = require("./user.routes");
 
 router.use("/auth", authRoutes);
 router.use("/layout", layoutRoutes);
@@ -28,6 +29,7 @@ router.use("/products", productRoutes);
 router.use("/wishlist", wishlistRoutes);
 router.use("/cart", cartRoutes);
 router.use("/config", configRoutes);
+router.use("/user", userRoutes);
 router.use("/", orderRoutes);
 
 module.exports = router;

@@ -50,3 +50,35 @@ exports.getVendors = async (req, res) => {
     });
   }
 };
+
+exports.getVendorDetails = async (req, res) => {
+  const { id } = req.params;
+  const { csCartApi } = config;
+  const authHeader =
+    "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+  const headers = {
+    Authorization: authHeader,
+    "Content-Type": "application/json",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    Accept: "*/*",
+  };
+
+  try {
+    const apiUrl = `${csCartApi.baseUrl}/NtCompaniesApi/${id}`;
+    console.log(`Fetching vendor details from: ${apiUrl}`);
+    const response = await axios.get(apiUrl, { headers });
+    return res.status(200).json(response.data);
+  } catch (error) {
+    console.error(`Error fetching vendor details for ID ${id}:`, error.message);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch vendor details",
+      error: error.message,
+    });
+  }
+};
