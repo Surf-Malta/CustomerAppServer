@@ -1,17 +1,32 @@
 const axios = require("axios");
 const config = require("../config/config");
 
+const sanitizeResponse = (data) => {
+  if (typeof data === "string") {
+    // Look for the first { and last } to extract JSON
+    const start = data.indexOf("{");
+    const end = data.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      const jsonStr = data.substring(start, end + 1);
+      try {
+        return JSON.parse(jsonStr);
+      } catch (e) {
+        console.error("Failed to parse extracted JSON:", e.message);
+      }
+    }
+  }
+  return data;
+};
+
 exports.getWishlist = async (req, res) => {
   try {
     const { csCartApi } = config;
     const { user_id } = req.query;
 
-    const apiUrl = `${csCartApi.baseUrl}/NtWishlistApi?user_id=${
-      user_id || 128
-    }`;
+    const apiUrl = `${csCartApi.baseUrl}/NtWishlistApi?user_id=${user_id}`;
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
@@ -38,22 +53,24 @@ exports.getWishlist = async (req, res) => {
     });
 
     console.log("Wishlist fetched successfully from: ", apiUrl);
-    if (response.data && response.data.products) {
+    const sanitizedData = sanitizeResponse(response.data);
+    if (sanitizedData && sanitizedData.products) {
       console.log(
-        `Wishlist contains ${response.data.products.length} products`
+        `Wishlist contains ${sanitizedData.products.length} products`,
       );
-      if (response.data.products.length > 0) {
+      if (sanitizedData.products.length > 0) {
         console.log(
           "First product fields:",
-          Object.keys(response.data.products[0]).join(", ")
+          Object.keys(sanitizedData.products[0]).join(", "),
         );
         console.log(
-          "First product cart_id:",
-          response.data.products[0].cart_id
+          "First product cart_id (wishlist_id/item_id):",
+          sanitizedData.products[0].wishlist_id ||
+            sanitizedData.products[0].item_id,
         );
       }
     }
-    res.status(200).json(response.data);
+    res.status(200).json(sanitizedData);
   } catch (error) {
     console.error("Error fetching wishlist:", error.message);
     if (error.response) {
@@ -73,12 +90,10 @@ exports.addToWishlist = async (req, res) => {
     const { user_id } = req.query;
     const postData = req.body;
 
-    const apiUrl = `${csCartApi.baseUrl}/NtWishlistApi?user_id=${
-      user_id || 152
-    }`;
+    const apiUrl = `${csCartApi.baseUrl}/NtWishlistApi?user_id=${user_id}`;
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const response = await axios.post(apiUrl, postData, {
@@ -104,7 +119,12 @@ exports.addToWishlist = async (req, res) => {
       },
     });
 
-    res.status(200).json(response.data);
+    const sanitizedData = sanitizeResponse(response.data);
+    console.log(
+      "Add to Wishlist external API response (sanitized):",
+      JSON.stringify(sanitizedData, null, 2),
+    );
+    res.status(200).json(sanitizedData);
   } catch (error) {
     console.error("Error adding to wishlist:", error.message);
     if (error.response) {
@@ -130,15 +150,14 @@ exports.removeFromWishlist = async (req, res) => {
       });
     }
 
-    const apiUrl = `${csCartApi.baseUrl}/NtWishlistApi?user_id=${
-      user_id || 152
-    }`;
+    const apiUrl = `${csCartApi.baseUrl}/NtWishlistApi?user_id=${user_id}`;
 
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
 
     const postData = {
-      user_id: String(user_id || 152),
+      user_id: String(user_id),
       remove_from_wishlist: "Y",
       cart_id: cart_id,
     };
@@ -153,7 +172,8 @@ exports.removeFromWishlist = async (req, res) => {
       },
     });
 
-    res.status(200).json(response.data);
+    const sanitizedData = sanitizeResponse(response.data);
+    res.status(200).json(sanitizedData);
   } catch (error) {
     console.error("Error removing from wishlist:", error.message);
     if (error.response) {

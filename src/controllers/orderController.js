@@ -3,7 +3,7 @@ const config = require("../config/config");
 
 exports.getOrders = async (req, res) => {
   try {
-    const { user_id = 128 } = req.query; // Default to 128 as requested
+    const { user_id } = req.query;
     const { csCartApi } = config;
 
     // Construct the external API URL
@@ -56,7 +56,7 @@ exports.getOrders = async (req, res) => {
 exports.getOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { user_id = 128 } = req.query;
+    const { user_id } = req.query;
     const { csCartApi } = config;
 
     const apiUrl = `${csCartApi.baseUrl}/NtOrdersApi/${orderId}/?user_id=${user_id}`;

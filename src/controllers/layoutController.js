@@ -3,16 +3,20 @@ const config = require("../config/config");
 
 exports.getHomeLayout = async (req, res) => {
   try {
-    const { image_width, user_id = 2 } = req.query;
+    const { image_width, user_id, category_id } = req.query;
     const { csCartApi } = config;
 
     // Construct the external API URL
-    const apiUrl = `${csCartApi.baseUrl}/NtHomepageLayoutApi/?image_width=${
+    let apiUrl = `${csCartApi.baseUrl}/NtHomepageLayoutApi/?image_width=${
       image_width || 20
-    }&user_id=${user_id}`;
+    }&user_id=${user_id || ""}`;
+
+    if (category_id) {
+      apiUrl += `&category_id=${category_id}`;
+    }
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {

@@ -4,24 +4,28 @@ const config = require("../config/config");
 exports.getProducts = async (req, res) => {
   try {
     const { csCartApi } = config;
-    const { company_id, variant_id, user_id } = req.query;
+    const {
+      company_id,
+      variant_id,
+      user_id,
+      q,
+      currency_code,
+      lang_code,
+      items_per_page,
+      category_id,
+      page,
+    } = req.query;
 
-    if (!company_id && !variant_id) {
-      return res.status(400).json({
-        status: "error",
-        message: "company_id or variant_id is required",
-      });
-    }
+    let apiUrl = `${csCartApi.baseUrl}/NtProductApi?user_id=${user_id || ""}`;
 
-    let apiUrl = `${csCartApi.baseUrl}/NtProductApi?user_id=${user_id || 128}`;
-
-    if (company_id) {
-      apiUrl += `&company_id=${company_id}`;
-    }
-
-    if (variant_id) {
-      apiUrl += `&variant_id=${variant_id}`;
-    }
+    if (company_id) apiUrl += `&company_id=${company_id}`;
+    if (variant_id) apiUrl += `&variant_id=${variant_id}`;
+    if (q) apiUrl += `&q=${encodeURIComponent(q)}`;
+    if (currency_code) apiUrl += `&currency_code=${currency_code}`;
+    if (lang_code) apiUrl += `&lang_code=${lang_code}`;
+    if (items_per_page) apiUrl += `&items_per_page=${items_per_page}`;
+    if (category_id) apiUrl += `&category_id=${category_id}`;
+    if (page) apiUrl += `&page=${page}`;
 
     const authHeader =
       "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
@@ -45,6 +49,41 @@ exports.getProducts = async (req, res) => {
     res.status(500).json({
       status: "error",
       message: "Failed to fetch products",
+      error: error.message,
+    });
+  }
+};
+exports.getSuggestions = async (req, res) => {
+  try {
+    const { csCartApi } = config;
+    const { keyword, items_per_page } = req.query;
+
+    const apiUrl = `${csCartApi.baseUrl}/NtSuggestionApi?keyword=${encodeURIComponent(
+      keyword || "",
+    )}&items_per_page=${items_per_page || 10}`;
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "*/*",
+      },
+    });
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error fetching suggestions:", error.message);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch suggestions",
       error: error.message,
     });
   }

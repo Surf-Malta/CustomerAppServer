@@ -6,6 +6,8 @@ exports.addToCart = async (req, res) => {
     const { csCartApi } = config;
     const productData = req.body;
 
+    // New API endpoint: https://dev.surf.mt/api/2.0/NtCartApi
+    // Payload should include user_id and product_data
     const apiUrl = `${csCartApi.baseUrl}/NtCartApi`;
 
     const authHeader = `Basic ${Buffer.from(
