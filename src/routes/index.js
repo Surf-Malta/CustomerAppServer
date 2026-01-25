@@ -20,6 +20,7 @@ const cartRoutes = require("./cart.routes");
 const configRoutes = require("./config.routes");
 const userRoutes = require("./user.routes");
 const notificationRoutes = require("./notification.routes");
+const reviewRoutes = require("./review.routes");
 
 router.use("/auth", authRoutes);
 router.use("/layout", layoutRoutes);
@@ -32,6 +33,7 @@ router.use("/cart", cartRoutes);
 router.use("/config", configRoutes);
 router.use("/user", userRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/reviews", reviewRoutes);
 router.use("/", orderRoutes);
 
 module.exports = router;
