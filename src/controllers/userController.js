@@ -14,7 +14,7 @@ exports.getUserProfile = async (req, res) => {
     }
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const configGet = {
@@ -70,7 +70,7 @@ exports.getUserAddresses = async (req, res) => {
     }
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const configGet = {
@@ -126,13 +126,13 @@ exports.getCart = async (req, res) => {
     }
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const configGet = {
       method: "get",
       maxBodyLength: Infinity,
-      url: `${csCartApi.baseUrl}/NtCartApi/?user_id=${user_id}`,
+      url: `${csCartApi.baseUrl}/NtCartApi?user_id=${user_id}`,
       headers: {
         Authorization: authHeader,
         "User-Agent":
@@ -164,7 +164,7 @@ exports.getCart = async (req, res) => {
     if (error.response) {
       console.error(
         "External API Error Response:",
-        JSON.stringify(error.response.data, null, 2)
+        JSON.stringify(error.response.data, null, 2),
       );
       console.error("External API Status:", error.response.status);
       res.status(error.response.status).json(error.response.data);
@@ -184,7 +184,7 @@ exports.createUser = async (req, res) => {
     const profileData = req.body;
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const configPost = {
@@ -201,7 +201,7 @@ exports.createUser = async (req, res) => {
     const response = await axios.request(configPost);
     console.log(
       "External API Response for Create User:",
-      JSON.stringify(response.data, null, 2)
+      JSON.stringify(response.data, null, 2),
     );
     res.status(200).json(response.data);
   } catch (error) {
@@ -231,7 +231,7 @@ exports.updateUser = async (req, res) => {
     }
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const configPut = {

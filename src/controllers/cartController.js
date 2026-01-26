@@ -7,14 +7,16 @@ exports.addToCart = async (req, res) => {
     const productData = req.body;
 
     // New API endpoint: https://dev.surf.mt/api/2.0/NtCartApi
-    // Payload should include user_id and product_data
     const apiUrl = `${csCartApi.baseUrl}/NtCartApi`;
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
-    const response = await axios.post(apiUrl, productData, {
+    const { user_id, product_data } = req.body;
+    const payload = user_id ? { user_id, product_data } : { product_data };
+
+    const response = await axios.post(apiUrl, payload, {
       headers: {
         Authorization: authHeader,
         "Content-Type": "application/json",
