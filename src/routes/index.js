@@ -21,6 +21,7 @@ const configRoutes = require("./config.routes");
 const userRoutes = require("./user.routes");
 const notificationRoutes = require("./notification.routes");
 const reviewRoutes = require("./review.routes");
+const checkoutRoutes = require("./checkout.routes");
 
 router.use("/auth", authRoutes);
 router.use("/layout", layoutRoutes);
@@ -34,6 +35,7 @@ router.use("/config", configRoutes);
 router.use("/user", userRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/reviews", reviewRoutes);
+router.use("/checkout", checkoutRoutes);
 router.use("/", orderRoutes);
 
 module.exports = router;
