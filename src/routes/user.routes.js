@@ -7,5 +7,8 @@ router.get("/addresses", userController.getUserAddresses);
 router.get("/cart", userController.getCart);
 router.post("/create", userController.createUser);
 router.put("/update/:id", userController.updateUser);
+router.delete("/profile/:id", userController.deleteProfile);
+router.get("/account/:id", userController.getUserAccount);
+router.post("/google-user", userController.googleUser);
 
 module.exports = router;

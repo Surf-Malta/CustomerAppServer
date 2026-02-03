@@ -38,3 +38,42 @@ exports.createReview = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get reviews for an object (e.g., product)
+ * @route GET /api/reviews
+ */
+exports.getReviews = async (req, res) => {
+  try {
+    const { csCartApi } = config;
+    const { object_id, object_type, user_id, image_width } = req.query;
+
+    const apiUrl = `${csCartApi.baseUrl}/NtReviewsApi?object_id=${object_id}&object_type=${
+      object_type || "P"
+    }&user_id=${user_id || ""}&image_width=${image_width || 200}`;
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: authHeader,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "*/*",
+      },
+    });
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error fetching reviews:", error.message);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch reviews",
+      error: error.message,
+    });
+  }
+};

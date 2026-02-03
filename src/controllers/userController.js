@@ -259,3 +259,116 @@ exports.updateUser = async (req, res) => {
     }
   }
 };
+
+exports.deleteProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { csCartApi } = config;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "User ID is required",
+      });
+    }
+
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
+
+    const configDelete = {
+      method: "delete",
+      url: `${csCartApi.baseUrl}/NtUserProfileApi/${id}`,
+      headers: { Authorization: authHeader },
+    };
+
+    const response = await axios.request(configDelete);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in deleteProfile:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        status: "error",
+        message: "Internal Server Error",
+      });
+    }
+  }
+};
+
+exports.getUserAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { csCartApi } = config;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "User ID is required",
+      });
+    }
+
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
+
+    const configGet = {
+      method: "get",
+      url: `${csCartApi.baseUrl}/NtUsersAccountApi/${id}`,
+      headers: {
+        Authorization: authHeader,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "*/*",
+      },
+    };
+
+    const response = await axios.request(configGet);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in getUserAccount:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        status: "error",
+        message: "Internal Server Error",
+      });
+    }
+  }
+};
+
+exports.googleUser = async (req, res) => {
+  try {
+    const { csCartApi } = config;
+    const payload = req.body;
+
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
+
+    const configPost = {
+      method: "post",
+      url: `${csCartApi.baseUrl}/NtGoogleUserApi`,
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
+      data: payload,
+    };
+
+    const response = await axios.request(configPost);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in googleUser:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        status: "error",
+        message: "Internal Server Error",
+      });
+    }
+  }
+};

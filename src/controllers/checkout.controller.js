@@ -8,7 +8,7 @@ const config = require("../config/config");
  */
 exports.getCheckoutData = async (req, res) => {
   try {
-    const { user_id } = req.query;
+    const { user_id, shipping_ids } = req.query;
     const { csCartApi } = config;
 
     if (!user_id) {
@@ -18,7 +18,10 @@ exports.getCheckoutData = async (req, res) => {
       });
     }
 
-    const apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi/?user_id=${user_id}`;
+    let apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi/?user_id=${user_id}`;
+    if (shipping_ids) {
+      apiUrl += `&shipping_ids=${shipping_ids}`;
+    }
 
     console.log(`Fetching checkout data for user ${user_id}...`);
 
@@ -54,6 +57,49 @@ exports.getCheckoutData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching checkout data",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Place an order
+ * @route POST /api/checkout
+ */
+exports.placeOrder = async (req, res) => {
+  try {
+    const { csCartApi } = config;
+    const payload = req.body;
+
+    const apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi`;
+
+    console.log("Placing order...");
+
+    const response = await axios.post(apiUrl, payload, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+      },
+      auth: {
+        username: csCartApi.username,
+        password: csCartApi.apiKey,
+      },
+    });
+
+    console.log("Order placed successfully");
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error placing order:", error.message);
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while placing order",
       error: error.message,
     });
   }

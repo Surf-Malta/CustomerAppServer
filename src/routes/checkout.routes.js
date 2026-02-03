@@ -4,5 +4,6 @@ const checkoutController = require("../controllers/checkout.controller");
 
 // GET /api/checkout - Get checkout data (payment methods, shipping methods, cart details)
 router.get("/", checkoutController.getCheckoutData);
+router.post("/", checkoutController.placeOrder);
 
 module.exports = router;

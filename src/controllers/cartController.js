@@ -52,3 +52,44 @@ exports.addToCart = async (req, res) => {
     });
   }
 };
+
+exports.removeFromCart = async (req, res) => {
+  try {
+    const { csCartApi } = config;
+    const { user_id, delete_id } = req.query;
+
+    if (!user_id || !delete_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "user_id and delete_id are required",
+      });
+    }
+
+    const apiUrl = `${csCartApi.baseUrl}/NtCartApi?user_id=${user_id}&delete_id=${delete_id}`;
+
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: authHeader,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "*/*",
+      },
+    });
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error removing from cart:", error.message);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      status: "error",
+      message: "Failed to remove from cart",
+      error: error.message,
+    });
+  }
+};
