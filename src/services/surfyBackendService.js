@@ -1,7 +1,7 @@
 const https = require("node:https");
 
 // Pure native implementation to bypass any global axios/config intercepts
-const G_KEY = "AIzaSyCqaCvuryed-xO4WQR0AX4LT84dWDR1PSg";
+const G_KEY = "AIzaSyB-NgfeF_5MA_RRH2otef_X0-KeUOB2f8c";
 const G_HOSTNAME = "generativelanguage.googleapis.com";
 const C_AUTH =
   "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
