@@ -6,8 +6,7 @@ router.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", message: "Server is running" });
 });
 
-// Import other routes here
-// Import other routes here
+// Import other routes
 const authRoutes = require("./auth.routes");
 const layoutRoutes = require("./layout.routes");
 const orderRoutes = require("./order.routes");
@@ -22,6 +21,7 @@ const userRoutes = require("./user.routes");
 const notificationRoutes = require("./notification.routes");
 const reviewRoutes = require("./review.routes");
 const checkoutRoutes = require("./checkout.routes");
+const chatbotRoutes = require("./chatbot.routes");
 
 router.use("/auth", authRoutes);
 router.use("/layout", layoutRoutes);
@@ -36,6 +36,7 @@ router.use("/user", userRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/checkout", checkoutRoutes);
+router.use("/chatbot", chatbotRoutes);
 router.use("/", orderRoutes);
 
 module.exports = router;
