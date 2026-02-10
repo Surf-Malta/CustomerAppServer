@@ -116,3 +116,121 @@ exports.verifyOtp = async (req, res) => {
     }
   }
 };
+
+exports.loginWithWhatsApp = async (req, res) => {
+  try {
+    const { destination } = req.body;
+    const { csCartApi } = config;
+
+    if (!destination) {
+      return res.status(400).json({
+        status: "error",
+        message: "Phone number (destination) is required",
+      });
+    }
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const configPost = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${csCartApi.baseUrl}/NtOtpLoginApi`,
+      headers: commonHeaders(authHeader),
+      data: JSON.stringify({
+        destination: destination,
+        verification_method: "phone",
+      }),
+    };
+
+    const response = await axios.request(configPost);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in loginWithWhatsApp:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res
+        .status(500)
+        .json({ status: "error", message: "Internal Server Error" });
+    }
+  }
+};
+
+exports.verifyWhatsAppOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    const { csCartApi } = config;
+
+    if (!phone || !otp) {
+      return res.status(400).json({
+        status: "error",
+        message: "Phone number and OTP are required",
+      });
+    }
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const configPut = {
+      method: "put",
+      maxBodyLength: Infinity,
+      url: `${csCartApi.baseUrl}/NtOtpLoginApi/1`,
+      headers: commonHeaders(authHeader),
+      data: JSON.stringify({
+        phone: phone,
+        otp: otp,
+        verification_method: "phone",
+      }),
+    };
+
+    const response = await axios.request(configPut);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in verifyWhatsAppOtp:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res
+        .status(500)
+        .json({ status: "error", message: "Internal Server Error" });
+    }
+  }
+};
+
+exports.createAccount = async (req, res) => {
+  try {
+    const { email, firstname, lastname, phone, phone_verified } = req.body;
+    const { csCartApi } = config;
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const configPost = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${csCartApi.baseUrl}/NtSignupApi`,
+      headers: commonHeaders(authHeader),
+      data: JSON.stringify({
+        email,
+        firstname,
+        lastname,
+        phone,
+        phone_verified,
+      }),
+    };
+
+    const response = await axios.request(configPost);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in createAccount:", error.message);
+    if (error.response) {
+      console.error("CS-Cart Error Response:", error.response.data);
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res
+        .status(500)
+        .json({ status: "error", message: "Internal Server Error" });
+    }
+  }
+};
