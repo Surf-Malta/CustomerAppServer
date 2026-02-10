@@ -1,5 +1,6 @@
 const axios = require("axios");
 const config = require("../config/config");
+const { rewriteImageUrls } = require("../utils/cdnParser");
 
 exports.getProducts = async (req, res) => {
   try {
@@ -30,8 +31,9 @@ exports.getProducts = async (req, res) => {
     if (nt_see_more_action)
       apiUrl += `&nt_see_more_action=${nt_see_more_action}`;
 
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {
@@ -43,7 +45,8 @@ exports.getProducts = async (req, res) => {
       },
     });
 
-    res.status(200).json(response.data);
+    const data = rewriteImageUrls(response.data);
+    res.status(200).json(data);
   } catch (error) {
     console.error("Error fetching products:", error.message);
     if (error.response) {
@@ -56,6 +59,7 @@ exports.getProducts = async (req, res) => {
     });
   }
 };
+
 exports.getSuggestions = async (req, res) => {
   try {
     const { csCartApi } = config;
@@ -65,8 +69,9 @@ exports.getSuggestions = async (req, res) => {
       keyword || "",
     )}&items_per_page=${items_per_page || 10}`;
 
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {
@@ -78,7 +83,8 @@ exports.getSuggestions = async (req, res) => {
       },
     });
 
-    res.status(200).json(response.data);
+    const data = rewriteImageUrls(response.data);
+    res.status(200).json(data);
   } catch (error) {
     console.error("Error fetching suggestions:", error.message);
     if (error.response) {
@@ -109,8 +115,9 @@ exports.getProductDetails = async (req, res) => {
       user_id || ""
     }&image_width=${image_width || 600}`;
 
-    const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    const authHeader = `Basic ${Buffer.from(
+      `${csCartApi.username}:${csCartApi.apiKey}`,
+    ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
       headers: {
@@ -122,7 +129,8 @@ exports.getProductDetails = async (req, res) => {
       },
     });
 
-    res.status(200).json(response.data);
+    const data = rewriteImageUrls(response.data);
+    res.status(200).json(data);
   } catch (error) {
     console.error(
       `Error fetching product details for ${req.params.id}:`,

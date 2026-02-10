@@ -12,4 +12,5 @@ module.exports = {
     apiKey: process.env.GEMINI_API_KEY,
     baseUrl: process.env.GEMINI_API_URL,
   },
+  cdnUrl: process.env.BUNNY_CDN_URL,
 };
