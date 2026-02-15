@@ -179,6 +179,7 @@ exports.verifyWhatsAppOtp = async (req, res) => {
       headers: commonHeaders(authHeader),
       data: JSON.stringify({
         phone: phone,
+        destination: phone,
         otp: otp,
         verification_method: "phone",
       }),
