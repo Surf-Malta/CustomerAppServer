@@ -18,7 +18,7 @@ exports.getCheckoutData = async (req, res) => {
       });
     }
 
-    let apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi/?user_id=${user_id}&store_access_key=a68342c7da8a436200bb5e39ed3ac056`;
+    let apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi/?user_id=${user_id}`;
     if (shipping_ids) {
       apiUrl += `&shipping_ids=${shipping_ids}`;
     }
@@ -76,8 +76,7 @@ exports.placeOrder = async (req, res) => {
 
     const { buy_now_product_id } = req.body;
 
-    const separator = buy_now_product_id ? "&" : "?";
-    const apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi${buy_now_product_id ? `?buy_now_product_id=${buy_now_product_id}` : ""}${separator}store_access_key=a68342c7da8a436200bb5e39ed3ac056`;
+    const apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi${buy_now_product_id ? `?buy_now_product_id=${buy_now_product_id}` : ""}`;
 
     console.log("Placing order...");
 
