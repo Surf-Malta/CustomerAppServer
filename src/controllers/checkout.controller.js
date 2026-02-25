@@ -8,7 +8,8 @@ const config = require("../config/config");
  */
 exports.getCheckoutData = async (req, res) => {
   try {
-    const { user_id, shipping_ids, buy_now_product_id } = req.query;
+    const { user_id, shipping_ids, buy_now_product_id, coupon_code } =
+      req.query;
     const { csCartApi } = config;
 
     if (!user_id) {
@@ -24,6 +25,9 @@ exports.getCheckoutData = async (req, res) => {
     }
     if (buy_now_product_id) {
       apiUrl += `&buy_now_product_id=${buy_now_product_id}`;
+    }
+    if (coupon_code) {
+      apiUrl += `&coupon_code=${coupon_code}`;
     }
 
     console.log(`Fetching checkout data for user ${user_id}...`);
