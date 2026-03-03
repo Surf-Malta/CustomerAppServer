@@ -7,7 +7,7 @@ exports.getCategories = async (req, res) => {
     const apiUrl = `${csCartApi.baseUrl}/NtCategoriesApi/`;
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {

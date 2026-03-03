@@ -11,7 +11,7 @@ exports.getOrders = async (req, res) => {
 
     // Basic Auth Header
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {
@@ -62,7 +62,7 @@ exports.getOrderDetails = async (req, res) => {
     const apiUrl = `${csCartApi.baseUrl}/NtOrdersApi/${orderId}/?user_id=${user_id}`;
 
     const authHeader = `Basic ${Buffer.from(
-      `${csCartApi.username}:${csCartApi.apiKey}`
+      `${csCartApi.username}:${csCartApi.apiKey}`,
     ).toString("base64")}`;
 
     const response = await axios.get(apiUrl, {

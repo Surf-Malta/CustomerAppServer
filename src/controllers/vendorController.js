@@ -35,7 +35,7 @@ exports.getVendors = async (req, res) => {
       } catch (fallbackError) {
         console.error(
           "Fallback to NtVendorsApi failed:",
-          fallbackError.message
+          fallbackError.message,
         );
       }
     }
