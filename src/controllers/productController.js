@@ -16,6 +16,9 @@ exports.getProducts = async (req, res) => {
       category_id,
       page,
       nt_see_more_action,
+      sort_by,
+      sort_order,
+      features_hash,
     } = req.query;
 
     let apiUrl = `${csCartApi.baseUrl}/NtProductApi?user_id=${user_id || ""}`;
@@ -30,6 +33,9 @@ exports.getProducts = async (req, res) => {
     if (page) apiUrl += `&page=${page}`;
     if (nt_see_more_action)
       apiUrl += `&nt_see_more_action=${nt_see_more_action}`;
+    if (sort_by) apiUrl += `&sort_by=${sort_by}`;
+    if (sort_order) apiUrl += `&sort_order=${sort_order}`;
+    if (features_hash) apiUrl += `&features_hash=${features_hash}`;
 
     const authHeader = `Basic ${Buffer.from(
       `${csCartApi.username}:${csCartApi.apiKey}`,
