@@ -22,6 +22,7 @@ const notificationRoutes = require("./notification.routes");
 const reviewRoutes = require("./review.routes");
 const checkoutRoutes = require("./checkout.routes");
 const chatbotRoutes = require("./chatbot.routes");
+const filterRoutes = require("./filter.routes");
 
 router.use("/auth", authRoutes);
 router.use("/layout", layoutRoutes);
@@ -37,6 +38,7 @@ router.use("/notifications", notificationRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/checkout", checkoutRoutes);
 router.use("/chatbot", chatbotRoutes);
+router.use("/filters", filterRoutes);
 router.use("/", orderRoutes);
 
 module.exports = router;
