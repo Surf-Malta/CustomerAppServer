@@ -275,3 +275,84 @@ exports.createAccount = async (req, res) => {
     }
   }
 };
+
+exports.signupOtpEmail = async (req, res) => {
+  try {
+    const { destination } = req.body;
+    const { csCartApi } = config;
+
+    if (!destination) {
+      return res.status(400).json({
+        status: "error",
+        message: "Email (destination) is required",
+      });
+    }
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const configPost = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${csCartApi.baseUrl}/NtOtpRegApi`,
+      headers: commonHeaders(authHeader),
+      data: JSON.stringify({
+        destination: destination,
+        verification_method: "email",
+      }),
+    };
+
+    const response = await axios.request(configPost);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in signupOtpEmail:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res
+        .status(500)
+        .json({ status: "error", message: "Internal Server Error" });
+    }
+  }
+};
+
+exports.verifyEmailOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const { csCartApi } = config;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        status: "error",
+        message: "Email and OTP are required",
+      });
+    }
+
+    const authHeader =
+      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+
+    const configPut = {
+      method: "put",
+      maxBodyLength: Infinity,
+      url: `${csCartApi.baseUrl}/NtOtpRegApi/1`,
+      headers: commonHeaders(authHeader),
+      data: JSON.stringify({
+        email: email,
+        otp: otp,
+        verification_method: "email",
+      }),
+    };
+
+    const response = await axios.request(configPut);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error in verifyEmailOtp:", error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res
+        .status(500)
+        .json({ status: "error", message: "Internal Server Error" });
+    }
+  }
+};
