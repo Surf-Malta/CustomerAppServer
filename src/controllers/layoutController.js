@@ -7,7 +7,7 @@ exports.getHomeLayout = async (req, res) => {
     const { csCartApi } = config;
 
     // Construct the external API URL
-    let apiUrl = `${csCartApi.baseUrl}/api/2.0/NtHomepageLayoutApi/?image_width=${
+    let apiUrl = `${csCartApi.baseUrl}/NtHomepageLayoutApi?image_width=${
       image_width || 20
     }&user_id=${user_id || ""}`;
 

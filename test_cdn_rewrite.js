@@ -11,7 +11,7 @@ const mockData = {
       product_id: 1,
       main_pair: {
         detailed: {
-          image_path: "https://dev.surf.mt/images/detailed/1/product.jpg",
+          image_path: "https://surf.mt/images/detailed/1/product.jpg",
         },
       },
     },
@@ -20,7 +20,7 @@ const mockData = {
       image_pairs: [
         {
           detailed: {
-            image_path: "http://dev.surf.mt/images/detailed/2/product2.jpg",
+            image_path: "http://surf.mt/images/detailed/2/product2.jpg",
           },
         },
       ],
@@ -30,7 +30,7 @@ const mockData = {
   someurl: "https://google.com/image.png",
 };
 
-console.log("Original Data Base URL:", "https://dev.surf.mt/images/");
+console.log("Original Data Base URL:", "https://surf.mt/images/");
 console.log("Target CDN URL:", config.cdnUrl);
 
 const rewritten = rewriteImageUrls(mockData);

@@ -10,16 +10,16 @@ const rewriteImageUrls = (data) => {
 
   if (typeof data === "string") {
     // Check if the string is an image URL from surf.mt
-    if (data.includes("https://dev.surf.mt/images/")) {
+    if (data.includes("https://surf.mt/images/")) {
       return data.replace(
-        "https://dev.surf.mt/images/",
+        "https://surf.mt/images/",
         `${config.cdnUrl}/images/`,
       );
     }
     // Also check for http
-    if (data.includes("http://dev.surf.mt/images/")) {
+    if (data.includes("http://surf.mt/images/")) {
       return data.replace(
-        "http://dev.surf.mt/images/",
+        "http://surf.mt/images/",
         `${config.cdnUrl}/images/`,
       );
     }

@@ -13,7 +13,7 @@ exports.createReview = async (req, res) => {
 
     // Using the hardcoded auth header consistent with other controllers in this project
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const response = await axios.post(apiUrl, payload, {
       headers: {
@@ -53,7 +53,7 @@ exports.getReviews = async (req, res) => {
     }&user_id=${user_id || ""}&image_width=${image_width || 200}`;
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const response = await axios.get(apiUrl, {
       headers: {

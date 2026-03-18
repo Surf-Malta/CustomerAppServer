@@ -19,7 +19,7 @@ exports.getCheckoutData = async (req, res) => {
       });
     }
 
-    let apiUrl = `${csCartApi.baseUrl}/api/2.0/NtCheckoutApi/?user_id=${user_id}`;
+    let apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi?user_id=${user_id}`;
     if (shipping_ids) {
       apiUrl += `&shipping_ids=${shipping_ids}`;
     }
@@ -80,7 +80,7 @@ exports.placeOrder = async (req, res) => {
 
     const { buy_now_product_id } = req.body;
 
-    const apiUrl = `${csCartApi.baseUrl}/api/2.0/NtCheckoutApi${buy_now_product_id ? `?buy_now_product_id=${buy_now_product_id}` : ""}`;
+    const apiUrl = `${csCartApi.baseUrl}/NtCheckoutApi${buy_now_product_id ? `?buy_now_product_id=${buy_now_product_id}` : ""}`;
 
     console.log(
       "Placing order with payload:",

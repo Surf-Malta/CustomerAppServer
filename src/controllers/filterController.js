@@ -6,7 +6,7 @@ exports.getFilters = async (req, res) => {
     const { image_width, user_id } = req.query;
     const { csCartApi } = config;
 
-    let apiUrl = `${csCartApi.baseUrl}/api/2.0/NtFiltersApi?image_width=${
+    let apiUrl = `${csCartApi.baseUrl}/NtFiltersApi?image_width=${
       image_width || 20
     }&user_id=${user_id || ""}`;
 

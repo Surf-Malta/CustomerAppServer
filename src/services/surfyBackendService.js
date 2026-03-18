@@ -4,8 +4,8 @@ const https = require("node:https");
 const G_KEY = "AIzaSyB-NgfeF_5MA_RRH2otef_X0-KeUOB2f8c";
 const G_HOSTNAME = "generativelanguage.googleapis.com";
 const C_AUTH =
-  "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
-const C_HOSTNAME = "dev.surf.mt";
+  "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
+const C_HOSTNAME = "surf.mt";
 
 async function callAiNative(prompt) {
   return new Promise((resolve, reject) => {

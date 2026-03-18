@@ -35,7 +35,7 @@ exports.loginWithEmail = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPost = {
       method: "post",
@@ -86,7 +86,7 @@ exports.verifyOtp = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPut = {
       method: "put",
@@ -130,7 +130,7 @@ exports.loginWithWhatsApp = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPost = {
       method: "post",
@@ -170,7 +170,7 @@ exports.verifyWhatsAppOtp = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPut = {
       method: "put",
@@ -212,7 +212,7 @@ exports.signupOtpWhatsApp = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPost = {
       method: "post",
@@ -245,7 +245,7 @@ exports.createAccount = async (req, res) => {
     const { csCartApi } = config;
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPost = {
       method: "post",
@@ -289,7 +289,7 @@ exports.signupOtpEmail = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPost = {
       method: "post",
@@ -329,7 +329,7 @@ exports.verifyEmailOtp = async (req, res) => {
     }
 
     const authHeader =
-      "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+      "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
     const configPut = {
       method: "put",

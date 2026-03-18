@@ -4,7 +4,7 @@ const config = require("../config/config");
 exports.getVendors = async (req, res) => {
   const { csCartApi } = config;
   const authHeader =
-    "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
   const headers = {
     Authorization: authHeader,
@@ -55,7 +55,7 @@ exports.getVendorDetails = async (req, res) => {
   const { id } = req.params;
   const { csCartApi } = config;
   const authHeader =
-    "Basic YWRtaW5Ac3VyZi5tdDpOOW9aMnlXMzc3cEg1VTExNTFiY3YyZlYyNDYySTk1NA==";
+    "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
 
   const headers = {
     Authorization: authHeader,
