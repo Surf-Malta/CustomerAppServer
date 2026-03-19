@@ -244,7 +244,7 @@ exports.createAccount = async (req, res) => {
     const { email, firstname, lastname, phone, phone_verified, nt_email_verify } = req.body;
     const { csCartApi } = config;
 
-    console.log("Create Account API Hit - Data:", JSON.stringify(req.body, null, 2));
+    console.log("Create Account Api Hit - Data:", JSON.stringify(req.body, null, 2));
 
     const authHeader =
       "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
