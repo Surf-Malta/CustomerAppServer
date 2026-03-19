@@ -241,8 +241,10 @@ exports.signupOtpWhatsApp = async (req, res) => {
 
 exports.createAccount = async (req, res) => {
   try {
-    const { email, firstname, lastname, phone, phone_verified } = req.body;
+    const { email, firstname, lastname, phone, phone_verified, nt_email_verify } = req.body;
     const { csCartApi } = config;
+
+    console.log("Create Account API Hit - Data:", JSON.stringify(req.body, null, 2));
 
     const authHeader =
       "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
@@ -258,6 +260,7 @@ exports.createAccount = async (req, res) => {
         lastname,
         phone,
         phone_verified,
+        nt_email_verify,
       }),
     };
 
