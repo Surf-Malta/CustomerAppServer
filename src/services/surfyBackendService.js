@@ -1,7 +1,7 @@
 const https = require("node:https");
 
 // Pure native implementation to bypass any global axios/config intercepts
-const G_KEY = "AIzaSyB-NgfeF_5MA_RRH2otef_X0-KeUOB2f8c";
+const G_KEY = "AIzaSyAoma8EXa8S3xjh-kHw7Z2AvHNx5niIN7U";
 const G_HOSTNAME = "generativelanguage.googleapis.com";
 const C_AUTH =
   "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
@@ -13,7 +13,7 @@ async function callAiNative(prompt) {
     const options = {
       hostname: G_HOSTNAME,
       port: 443,
-      path: `/v1beta/models/gemini-flash-latest:generateContent?key=${G_KEY}`,
+      path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${G_KEY}`,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
