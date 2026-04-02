@@ -1,10 +1,11 @@
 const https = require("node:https");
 
-// Pure native implementation to bypass any global axios/config intercepts
-const G_KEY = "AIzaSyAoma8EXa8S3xjh-kHw7Z2AvHNx5niIN7U";
+const config = require("../config/config");
+
+// Configuration from environment variables
+const G_KEY = config.gemini.apiKey;
 const G_HOSTNAME = "generativelanguage.googleapis.com";
-const C_AUTH =
-  "Basic YWRtaW5Ac3VyZi5tdDpSMlZXbjE2N1VaUFc2Y3VLNDEwMWdCMTM2UTk0UFQ2SA==";
+const C_AUTH = `Basic ${Buffer.from(`${config.csCartApi.username}:${config.csCartApi.apiKey}`).toString("base64")}`;
 const C_HOSTNAME = "surf.mt";
 
 async function callAiNative(prompt) {
@@ -18,6 +19,7 @@ async function callAiNative(prompt) {
       headers: {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(data),
+        "User-Agent": "Surfy/1.0.0 (Chatbot Service)",
       },
     };
 
@@ -49,6 +51,7 @@ async function searchProductsNative(q) {
       headers: {
         Authorization: C_AUTH,
         Accept: "*/*",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
     };
 
@@ -144,19 +147,31 @@ exports.processChat = async (message) => {
           .replace(/```/g, "")
           .trim();
         const aKeywords = JSON.parse(aText).keywords || [];
-        console.log(
-          `[SurfyService] 💡 AI Suggested Alternatives: ${JSON.stringify(aKeywords)}`,
-        );
-
         if (aKeywords.length > 0) {
           console.log(
-            `[SurfyService] 🔄 Searching specifically for alternatives: "${aKeywords.join(" ")}"`,
+            `[SurfyService] 💡 AI Suggested Alternatives: ${JSON.stringify(aKeywords)}`,
           );
-          pResult = await searchProductsNative(aKeywords.join(" "));
-          products = pResult.products || [];
-          console.log(
-            `[SurfyService] 📦 Alternative Search Results: ${products.length} products found.`,
-          );
+
+          // Try each alternative individually until we find products
+          for (const alt of aKeywords) {
+            console.log(
+              `[SurfyService] 🔄 Searching specifically for alternative: "${alt}"`,
+            );
+            pResult = await searchProductsNative(alt);
+            products = pResult.products || [];
+            if (products.length > 0) {
+              console.log(
+                `[SurfyService] 📦 Alternative Search Results: ${products.length} products found for "${alt}".`,
+              );
+              break;
+            }
+          }
+
+          if (products.length === 0) {
+            console.log(
+              `[SurfyService] ⚠️ Still 0 products found after trying all alternatives.`,
+            );
+          }
         } else {
           console.log(
             `[SurfyService] ❌ No actionable alternative keywords generated.`,
