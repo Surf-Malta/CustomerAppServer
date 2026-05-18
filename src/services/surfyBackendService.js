@@ -14,6 +14,10 @@ const G_HOSTNAME = "generativelanguage.googleapis.com";
 const C_AUTH = config && config.csCartApi ? `Basic ${Buffer.from(`${config.csCartApi.username}:${config.csCartApi.apiKey}`).toString("base64")}` : "";
 const C_HOSTNAME = "surf.mt";
 
+let cachedCategoryList = null;
+let cachedCategoryMap = {};
+let lastCategoryFetchTime = 0;
+
 let Conversation;
 try {
   Conversation = mongoose.model('Conversation');
@@ -83,8 +87,11 @@ async function performVectorSearch(phrase, filters) {
     filterConditions.price = { $lte: Number(filters.price_max) };
   }
   if (filters?.category) {
-    const catId = Number(filters.category);
-    if (!isNaN(catId)) {
+    let catId = Number(filters.category);
+    if (isNaN(catId) && typeof filters.category === 'string') {
+      catId = cachedCategoryMap[filters.category];
+    }
+    if (catId && !isNaN(catId)) {
       filterConditions.category_ids = catId;
     }
   }
@@ -121,22 +128,55 @@ exports.processChat = async (message, session_id = "default") => {
     return await legacyProcessChat(message);
   }
 
-  console.log(`[SurfyService] 🟢 Vector Process Chat Start: "${message}" (Session: ${session_id})`);
+  // console.log(`\n======================================================`);
+  // console.log(`🤖 LUCY AI PIPELINE STARTED`);
+  // console.log(`======================================================`);
+  // console.log(`👉 STEP 1: Received User Message`);
+  // console.log(`   Message: "${message}"`);
+  // console.log(`   Session: ${session_id}`);
+
   try {
+    // console.log(`\n👉 STEP 2: Fetching Weather Context`);
     const weatherContext = await getMaltaWeatherContext();
+    // console.log(`   Result: ${weatherContext}`);
 
     // 1. Intent Classification
+    // console.log(`\n👉 STEP 3: Intent Classification`);
+    // console.log(`   Sending message to Gemini to determine intent...`);
+
+    // Cache categories for 15 minutes to reduce DB load
+    if (!cachedCategoryList || Date.now() - lastCategoryFetchTime > 15 * 60 * 1000) {
+      const categories = await mongoose.connection.db.collection('categories').find({}, { projection: { category: 1, category_id: 1 } }).toArray();
+      cachedCategoryList = categories.map(c => c.category).filter(Boolean).join(', ');
+
+      cachedCategoryMap = {};
+      categories.forEach(c => {
+        if (c.category) cachedCategoryMap[c.category] = Number(c.category_id);
+      });
+
+      lastCategoryFetchTime = Date.now();
+      // console.log(`   [Cache Miss] Categories loaded from DB: ${cachedCategoryList}`);
+    } else {
+      // console.log(`   [Cache Hit] Categories loaded from memory.`);
+    }
+    const categoryList = cachedCategoryList;
+
     const intentPrompt = `User message: "${message}"
 Context: ${weatherContext}
 
+The available product categories in the store are: ${categoryList}
+
 Classify the user's intent as "product_search" or "advice". 
 If "product_search", extract the best search phrase based on their request. 
-Also extract filters if present: price_max (number or null), category (string/number or null).
+Also extract a top-level category if applicable, and filters if present: price_max (number or null), category (string/number or null).
+
+When extracting the category field or filter, only use a category name from the list exactly as written. Do not invent or assume category names. If no category matches perfectly, use null.
 
 Return ONLY valid JSON in this format:
 {
   "intent": "product_search" | "advice",
   "search_phrase": "...",
+  "category": null,
   "filters": {
     "price_max": null,
     "category": null
@@ -144,27 +184,33 @@ Return ONLY valid JSON in this format:
 }`;
 
     const intentData = await callGeminiAxios("You are an intent classifier for a retail chatbot.", intentPrompt, true);
-    console.log(`[SurfyService] 🧠 Intent Classification:`, intentData);
+    console.log(`   Result: Intent determined as "${intentData?.intent}" with phrase: "${intentData?.search_phrase}"`);
 
     let products = [];
     let searchResultsContext = "";
 
     if (intentData && intentData.intent === "product_search") {
+      // console.log(`\n👉 STEP 4: Search Phrase Enhancement`);
+      // console.log(`   Asking Gemini to enhance phrase using context...`);
       const enhancePrompt = `Context: ${weatherContext}\nOriginal query: "${intentData.search_phrase || message}"\nRewrite this query to be highly descriptive for a vector embedding search, incorporating any relevant context (like weather/time) if it makes sense for a product search. Return only the enhanced string.`;
       const enhancedPhrase = await callGeminiAxios(null, enhancePrompt, false);
-      console.log(`[SurfyService] 🔍 Enhanced Search Phrase: "${enhancedPhrase}"`);
+      // console.log(`   Result: "${enhancedPhrase}"`);
 
+      // console.log(`\n👉 STEP 5: MongoDB Vector Search`);
+      // console.log(`   Searching database for matches...`);
       let searchResults = await performVectorSearch(enhancedPhrase, intentData.filters);
 
       if (searchResults.length > 0 && searchResults[0].score < VECTOR_SEARCH_THRESHOLD) {
-        console.log(`[SurfyService] ⚠️ Top score ${searchResults[0].score} below threshold ${VECTOR_SEARCH_THRESHOLD}. Retrying...`);
+        console.log(`   ⚠️ Top score (${searchResults[0].score}) is below threshold (${VECTOR_SEARCH_THRESHOLD}).`);
+        console.log(`   🔄 Retrying search with broader phrase...`);
         const retryPrompt = `The previous search phrase "${enhancedPhrase}" yielded poor results. Write a broader, more general product search phrase for: "${message}". Return only the string without quotes.`;
         const broaderPhrase = await callGeminiAxios(null, retryPrompt, false);
-        console.log(`[SurfyService] 🔄 Retrying Vector Search with: "${broaderPhrase}"`);
+        console.log(`   Result broader phrase: "${broaderPhrase}"`);
         searchResults = await performVectorSearch(broaderPhrase, intentData.filters);
       }
 
       if (searchResults.length > 0) {
+        // console.log(`   Result: Found ${searchResults.length} matching products. Top score: ${searchResults[0].score}`);
         const productIds = searchResults.map(r => r.product_id);
         products = await Product.find({ product_id: { $in: productIds } })
           .select('-embedding')
@@ -182,17 +228,19 @@ Return ONLY valid JSON in this format:
           main_pair: p.main_pair || null
         }));
 
-        searchResultsContext = "Product search results:\n" + products.slice(0, 5).map(p => `- ${p.product} (Price: $${p.price})`).join("\n");
+        searchResultsContext = "Product search results:\n" + products.slice(0, 5).map(p => `- ${p.product} (Price: €${p.price})`).join("\n");
       } else {
         searchResultsContext = "No products found for this request.";
       }
     }
 
+    // console.log(`\n👉 STEP 6: Fetching Conversation History`);
     let conversation = await Conversation.findOne({ session_id });
     if (!conversation) {
       conversation = new Conversation({ session_id, messages: [] });
     }
     const history = conversation.messages.slice(-8);
+    // console.log(`   Result: Retrieved ${history.length} previous messages for context.`);
     const historyText = history.length > 0
       ? history.map(m => `${m.role === 'user' ? 'User' : 'Lucy'}: ${m.text}`).join("\n")
       : "No previous conversation.";
@@ -224,6 +272,10 @@ Behavior rules:
 • If results are partial matches, present them as "closest options" or "good alternatives"
 • Do not sound robotic or use structured lists unless explicitly needed
 • Avoid overly long explanations unless the user asks for details
+
+The available product categories in the store are: ${categoryList}
+
+When classifying user intent or matching products to categories, only use category names from this list exactly as written. Do not invent or assume category names.
 
 Tone:
 • Friendly
@@ -261,8 +313,22 @@ ${searchResultsContext}
 User: ${message}
 Lucy:`;
 
+    // console.log(`\n👉 STEP 7: Final Response Generation`);
+    // console.log(`   Sending history, products, and context to Gemini...`);
     const finalMessage = await callGeminiAxios(systemPrompt, finalPrompt, false);
-    console.log(`[SurfyService] 📤 Final Reply: "${finalMessage}"`);
+
+    console.log(`\n======================================================`);
+    console.log(`🤖 LUCY FINAL RESPONSE`);
+    console.log(`======================================================`);
+    console.log(`💬 Message: "${finalMessage}"`);
+    console.log(`📦 Products Attached: ${products.length} item(s)`);
+    if (products.length > 0) {
+      products.slice(0, 3).forEach((p, i) => {
+        console.log(`   ${i + 1}. ${p.product} (Price: €${p.price})`);
+      });
+      if (products.length > 3) console.log(`   ...and ${products.length - 3} more`);
+    }
+    console.log(`======================================================\n`);
 
     conversation.messages.push({ role: "user", text: message, timestamp: new Date() });
     conversation.messages.push({ role: "lucy", text: finalMessage, timestamp: new Date() });
@@ -275,7 +341,8 @@ Lucy:`;
     };
 
   } catch (err) {
-    console.error(`[SurfyService] ❌ Error in Vector ProcessChat:`, err);
+    console.error(`\n❌ LUCY AI PIPELINE ERROR:`, err);
+    console.log(`======================================================\n`);
     return {
       message: "I'm having a little trouble thinking right now. Could you please try again in a moment?",
       products: []
