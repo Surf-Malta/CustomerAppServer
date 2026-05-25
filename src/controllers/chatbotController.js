@@ -12,11 +12,20 @@ exports.handleChat = async (req, res) => {
     console.log(`[Chatbot] Processing: "${message}"`);
     const result = await surfyService.processChat(message);
 
+    //product response
     res.status(200).json({
       message: result.message,
       products: result.products,
       status: "success",
     });
+
+    //catgeory response
+    // res.status(200).json({
+    //   message: result.message,
+    //   categories: result.relevantCategories,
+    //   status: "success",
+    // });
+
   } catch (error) {
     console.error("[Chatbot Error] Final Catch:", error.stack);
     res.status(500).json({
