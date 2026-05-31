@@ -32,7 +32,6 @@ try {
   Conversation = mongoose.model('Conversation', ConversationSchema);
 }
 
-
 async function getMaltaWeatherContext() {
   const timeOfDay = new Date().toLocaleString("en-MT", { timeZone: "Europe/Malta" });
   if (!WEATHER_API_KEY) {
@@ -111,9 +110,7 @@ async function performVectorSearch(phrase, filters) {
   }
 
   const pipeline = [
-    {
-      $vectorSearch: vectorSearchStage
-    },
+    { $vectorSearch: vectorSearchStage },
     {
       $project: {
         score: { $meta: "vectorSearchScore" },
@@ -149,265 +146,315 @@ async function getRelevantCategories(message) {
   return await Category.aggregate(pipeline);
 }
 
+function userMentionedWeatherFallback(message) {
+  return /\b(weather|rain|rainy|hot|cold|summer|winter|warm|cool|humid|sunny|beach|snow|snowy|freezing|chilly|windy|heatwave|monsoon|drizzle|stormy|tropical|outdoor|picnic|skiing|swimming|poolside|hike|hiking)\b/i.test(message);
+}
+
+async function userMentionedWeather(message) {
+  try {
+    const prompt = `Does the following user message explicitly or implicitly indicate they want product suggestions based on weather, temperature, season, or outdoor conditions?
+
+User message: "${message}"
+
+Answer with ONLY "yes" or "no". No explanation.
+
+Examples:
+- "white shirt" → no
+- "something warm to wear" → yes
+- "it's been really hot lately" → yes
+- "running shoes" → no
+- "beach outfit" → yes
+- "dress for a party" → no
+- "leather handbag" → no
+- "jacket for the cold" → yes`;
+
+    const result = await callGeminiAxios(null, prompt, false);
+    const answer = result?.toLowerCase().trim();
+
+    if (answer === 'yes') return true;
+    if (answer === 'no') return false;
+
+    // Gemini returned something unexpected — fall back to regex
+    console.warn(`[SurfyService] Weather detection: unexpected Gemini response "${result}", falling back to regex`);
+    return userMentionedWeatherFallback(message);
+
+  } catch (err) {
+    // Gemini failed — fall back to regex silently so pipeline continues
+    console.warn(`[SurfyService] Weather detection: Gemini call failed (${err.message}), falling back to regex`);
+    return userMentionedWeatherFallback(message);
+  }
+}
+
+
+async function buildEnhancePrompt(searchPhrase, originalMessage, weatherContext) {
+  const weatherDetected = await userMentionedWeather(originalMessage);
+  const weatherHint = weatherDetected
+    ? `\nWeather context (include because user mentioned it): ${weatherContext}`
+    : '';
+
+  return `You are enhancing a product search query for a retail store's vector embedding search.
+
+Original query: "${searchPhrase}"${weatherHint}
+
+Rules:
+- Only add product-specific attributes such as: material (cotton, linen, leather, wool, denim), fit (slim, loose, oversized, tailored), style (formal, casual, sporty, elegant), or gender (mens, womens, unisex) — but ONLY when clearly implied by the query
+- Do NOT add weather words (warm, cool, summer, lightweight, breathable) UNLESS the user explicitly mentioned weather in their message
+- Do NOT add location names (Malta, Mediterranean, etc.)
+- Do NOT add lifestyle or generic marketing words (gift, fashion, trendy, accessories, stylish, popular)
+- Do NOT add seasonal words (spring, autumn) unless the user said them
+- Keep the result tightly focused on the core product noun and its direct, obvious attributes
+- Return ONLY the enhanced search string — no explanation, no quotes, no extra text
+
+Examples of correct behaviour:
+- "white shirt" → white cotton shirt formal casual mens
+- "running shoes" → running shoes athletic sport mens womens
+- "dress for a party" → party dress womens evening formal
+- "leather handbag" → leather handbag womens shoulder tote
+- "warm jacket" (user said warm) → warm jacket winter coat heavyweight mens womens
+- "sunglasses" → sunglasses polarized UV protection mens womens`;
+}
+
+
 exports.processChat = async (message, session_id = "default") => {
   if (!USE_VECTOR_SEARCH) {
     console.log(`[SurfyService] 🟢 Legacy Keyword Process Chat Start: "${message}"`);
     return await legacyProcessChat(message);
   }
 
-  // console.log(`\n======================================================`);
-  // console.log(`🤖 LUCY AI PIPELINE STARTED`);
-  // console.log(`======================================================`);
+  console.log(`\n======================================================`);
+  console.log(`🤖 LUCY AI PIPELINE STARTED`);
+  console.log(`======================================================`);
   console.log(`👉 STEP 1: Received User Message`);
   console.log(`   Message: "${message}"`);
-  // console.log(`   Session: ${session_id}`);
-
+  console.log(`   Session: ${session_id}`);
 
   try {
-    const relevantCategories =
-      await getRelevantCategories(message);
 
-    return { "relevantCategories": relevantCategories };
-    // console.log(`\n👉 STEP 2: Fetching Weather Context`);
-    // const weatherContext = await getMaltaWeatherContext();
-    // console.log(`   Result: ${weatherContext}`);
+    console.log(`\n👉 STEP 2: Fetching Weather Context`);
+    const weatherContext = await getMaltaWeatherContext();
+    console.log(`   Result: ${weatherContext}`);
 
-    // 1. Intent Classification
-    // console.log(`\n👉 STEP 3: Intent Classification`);
-    // console.log(`   Sending message to Gemini to determine intent...`);
+    console.log(`\n👉 STEP 3: Intent Classification`);
 
     // Cache categories for 15 minutes to reduce DB load
-    // if (!cachedCategoryList || Date.now() - lastCategoryFetchTime > 15 * 60 * 1000) {
-    //   const categories = await mongoose.connection.db.collection('categories').find({}, { projection: { category: 1, category_id: 1 } }).toArray();
-    //   cachedCategoryList = categories.map(c => c.category).filter(Boolean).join(', ');
+    if (!cachedCategoryList || Date.now() - lastCategoryFetchTime > 15 * 60 * 1000) {
+      const categories = await mongoose.connection.db
+        .collection('categories')
+        .find({}, { projection: { category: 1, category_id: 1 } })
+        .toArray();
 
-    //   cachedCategoryMap = {};
-    //   cachedCategoryIdMap = {};
-    //   categories.forEach(c => {
+      cachedCategoryList = categories.map(c => c.category).filter(Boolean).join(', ');
+      cachedCategoryMap = {};
+      cachedCategoryIdMap = {};
+      categories.forEach(c => {
+        if (c.category) cachedCategoryMap[c.category] = Number(c.category_id);
+        if (c.category_id) cachedCategoryIdMap[Number(c.category_id)] = c.category;
+      });
+      lastCategoryFetchTime = Date.now();
+      console.log(`   [Cache Miss] Categories loaded from DB`);
+    } else {
+      console.log(`   [Cache Hit] Categories loaded from memory`);
+    }
+    const categoryList = cachedCategoryList;
 
-    //     if (c.category) {
-    //       cachedCategoryMap[c.category] = Number(c.category_id);
-    //     }
+    console.log(`\n👉 STEP 3a: Fetching Relevant Categories (Task 1)`);
+    const relevantCategories = await getRelevantCategories(message);
+    const relevantCategoryNames = relevantCategories.map(c => c.category).filter(Boolean).join(', ');
+    console.log(`   Relevant categories: ${relevantCategoryNames}`);
 
-    //     if (c.category_id) {
-    //       cachedCategoryIdMap[Number(c.category_id)] = c.category;
-    //     }
+    const intentPrompt = `User message: "${message}"
+Context: ${weatherContext}
 
-    //   });
+The available product categories in the store are: ${categoryList}
 
-    //   lastCategoryFetchTime = Date.now();
-    //   // console.log(`   [Cache Miss] Categories loaded from DB: ${cachedCategoryList}`);
-    // } else {
-    //   // console.log(`   [Cache Hit] Categories loaded from memory.`);
-    // }
-    // const categoryList = cachedCategoryList;
+Classify the user's intent as "product_search" or "advice".
+If "product_search", extract the best search phrase based on their request.
+Also extract a top-level category if applicable, and filters if present: price_max (number or null), category (string/number or null).
 
-    //     const intentPrompt = `User message: "${message}"
-    // Context: ${weatherContext}
+When extracting the category field or filter, only use a category name from the list exactly as written. Do not invent or assume category names. If no category matches perfectly, use null.
 
-    // // The available product categories in the store are: ${categoryList}
+Return ONLY valid JSON in this format:
+{
+  "intent": "product_search" | "advice",
+  "search_phrase": "...",
+  "category": null,
+  "filters": {
+    "price_max": null,
+    "category": null
+  }
+}`;
 
-    // Classify the user's intent as "product_search" or "advice". 
-    // If "product_search", extract the best search phrase based on their request. 
-    // Also extract a top-level category if applicable, and filters if present: price_max (number or null), category (string/number or null).
+    const intentData = await callGeminiAxios("You are an intent classifier for a retail chatbot.", intentPrompt, true);
+    console.log(`   Result: Intent determined as "${intentData?.intent}" with phrase: "${intentData?.search_phrase}"`);
 
-    // When extracting the category field or filter, only use a category name from the list exactly as written. Do not invent or assume category names. If no category matches perfectly, use null.
+    let products = [];
+    let searchResultsContext = "";
 
-    // Return ONLY valid JSON in this format:
-    // {
-    //   "intent": "product_search" | "advice",
-    //   "search_phrase": "...",
-    //   "category": null,
-    //   "filters": {
-    //     "price_max": null,
-    //     "category": null
-    //   }
-    // }`;
+    if (intentData && intentData.intent === "product_search") {
 
-    // const intentData = await callGeminiAxios("You are an intent classifier for a retail chatbot.", intentPrompt, true);
-    // console.log(`   Result: Intent determined as "${intentData?.intent}" with phrase: "${intentData?.search_phrase}"`);
+      console.log(`\n STEP 4: Search Phrase Enhancement (Task 2a)`);
+      const weatherDetectedForLog = await userMentionedWeather(message);
+      console.log(`   Weather mentioned by user: ${weatherDetectedForLog}`);
+      const enhancePrompt = await buildEnhancePrompt(
+        intentData.search_phrase || message,
+        message,
+        weatherContext
+      );
+      const enhancedPhrase = await callGeminiAxios(null, enhancePrompt, false);
+      console.log(`   Result enhancedPhrase: "${enhancedPhrase}"`);
 
-    // let products = [];
-    // let searchResultsContext = "";
+      console.log(`\n STEP 5: MongoDB Vector Search`);
+      let searchResults = await performVectorSearch(enhancedPhrase, intentData.filters);
 
-    // if (intentData && intentData.intent === "product_search") {
-    //   // console.log(`\n👉 STEP 4: Search Phrase Enhancement`);
-    //   // console.log(`   Asking Gemini to enhance phrase using context...`);
-    //   const enhancePrompt = `Context: ${weatherContext}\nOriginal query: "${intentData.search_phrase || message}"\nRewrite this query to be highly descriptive for a vector embedding search, incorporating any relevant context (like weather/time) if it makes sense for a product search. Return only the enhanced string.`;
-    //   const enhancedPhrase = await callGeminiAxios(null, enhancePrompt, false);
-    //   console.log(`   Result enhancedPhrase: "${enhancedPhrase}"`);
+      if (searchResults.length > 0 && searchResults[0].score < VECTOR_SEARCH_THRESHOLD) {
+        console.log(`    Top score (${searchResults[0].score}) is below threshold (${VECTOR_SEARCH_THRESHOLD}).`);
+        console.log(`    Retrying search with broader phrase...`);
+        const retryPrompt = `The previous search phrase "${enhancedPhrase}" yielded poor results. Write a broader, more general product search phrase for: "${message}". Return only the string without quotes.`;
+        const broaderPhrase = await callGeminiAxios(null, retryPrompt, false);
+        console.log(`   Result broader phrase: "${broaderPhrase}"`);
+        searchResults = await performVectorSearch(broaderPhrase, intentData.filters);
+      }
 
-    //   // console.log(`\n👉 STEP 5: MongoDB Vector Search`);
-    //   // console.log(`   Searching database for matches...`);
-    //   let searchResults = await performVectorSearch(enhancedPhrase, intentData.filters);
+      if (searchResults.length > 0) {
+        console.log(`   Result: Found ${searchResults.length} matching products. Top score: ${searchResults[0].score}`);
+        const productIds = searchResults.map(r => r.product_id);
+        products = await Product.find({ product_id: { $in: productIds } })
+          .select('-embedding')
+          .lean();
 
-    //   if (searchResults.length > 0 && searchResults[0].score < VECTOR_SEARCH_THRESHOLD) {
-    //     console.log(`   ⚠️ Top score (${searchResults[0].score}) is below threshold (${VECTOR_SEARCH_THRESHOLD}).`);
-    //     console.log(`   🔄 Retrying search with broader phrase...`);
-    //     const retryPrompt = `The previous search phrase "${enhancedPhrase}" yielded poor results. Write a broader, more general product search phrase for: "${message}". Return only the string without quotes.`;
-    //     const broaderPhrase = await callGeminiAxios(null, retryPrompt, false);
-    //     console.log(`   Result broader phrase: "${broaderPhrase}"`);
-    //     searchResults = await performVectorSearch(broaderPhrase, intentData.filters);
-    //   }
+        products.sort((a, b) => productIds.indexOf(a.product_id) - productIds.indexOf(b.product_id));
 
-    //   if (searchResults.length > 0) {
-    //     // console.log(`   Result: Found ${searchResults.length} matching products. Top score: ${searchResults[0].score}`);
-    //     const productIds = searchResults.map(r => r.product_id);
-    //     products = await Product.find({ product_id: { $in: productIds } })
-    //       .select('-embedding')
-    //       .lean();
+        products = products.map(p => ({
+          ...p,
+          format_price: p.price ? `€${Number(p.price).toFixed(2)}` : "€0.00",
+          format_list_price: p.list_price ? `€${Number(p.list_price).toFixed(2)}` : undefined,
+          discount_prc: p.list_price && p.price < p.list_price
+            ? ((p.list_price - p.price) / p.list_price) * 100
+            : undefined,
+          main_pair: p.main_pair || null
+        }));
 
-    //     products.sort((a, b) => productIds.indexOf(a.product_id) - productIds.indexOf(b.product_id));
+        searchResultsContext = "Product search results:\n" + products.slice(0, 5).map(p => `- ${p.product} (Price: €${p.price})`).join("\n");
+      } else {
+        console.log(`   Result: No products found.`);
+        searchResultsContext = "No products found for this request.";
+      }
+    }
 
-    //     products = products.map(p => ({
-    //       ...p,
-    //       format_price: p.price ? `€${Number(p.price).toFixed(2)}` : "€0.00",
-    //       format_list_price: p.list_price ? `€${Number(p.list_price).toFixed(2)}` : undefined,
-    //       discount_prc: p.list_price && p.price < p.list_price
-    //         ? ((p.list_price - p.price) / p.list_price) * 100
-    //         : undefined,
-    //       main_pair: p.main_pair || null
-    //     }));
+    console.log(`\n STEP 6: Fetching Conversation History`);
+    let conversation = await Conversation.findOne({ session_id });
+    if (!conversation) {
+      conversation = new Conversation({ session_id, messages: [] });
+    }
+    const history = conversation.messages.slice(-8);
+    console.log(`   Result: Retrieved ${history.length} previous messages for context.`);
+    const historyText = history.length > 0
+      ? history.map(m => `${m.role === 'user' ? 'User' : 'Lucy'}: ${m.text}`).join("\n")
+      : "No previous conversation.";
 
-    //     searchResultsContext = "Product search results:\n" + products.slice(0, 5).map(p => `- ${p.product} (Price: €${p.price})`).join("\n");
-    //   } else {
-    //     searchResultsContext = "No products found for this request.";
-    //   }
-    // }
+    const systemPrompt = `
+You are Lucy, the AI shopping assistant for Surf Malta.
 
-    // console.log(`\n👉 STEP 6: Fetching Conversation History`);
-    // let conversation = await Conversation.findOne({ session_id });
-    // if (!conversation) {
-    //   conversation = new Conversation({ session_id, messages: [] });
-    // }
-    // const history = conversation.messages.slice(-8);
-    // // console.log(`   Result: Retrieved ${history.length} previous messages for context.`);
-    // const historyText = history.length > 0
-    //   ? history.map(m => `${m.role === 'user' ? 'User' : 'Lucy'}: ${m.text}`).join("\n")
-    //   : "No previous conversation.";
+Your job is to help users discover and choose products naturally through friendly, helpful, and conversational interactions.
 
-    //     const systemPrompt = `
-    // You are Lucy, the AI shopping assistant for Surf Malta.
+You will receive:
+• Weather/Time context
+• Conversation history
+• User message
+• A list of relevant product results from the product database (if available)
 
-    // Your job is to help users discover and choose products naturally through friendly, helpful, and conversational interactions.
+Your responsibilities:
+• Understand the user's intent based on the current message AND conversation history
+• Use weather/time context when relevant (e.g., suggesting summer clothes, rainy-day items, seasonal needs)
+• Recommend products naturally in a human, conversational way
+• Briefly explain why the products match the user's needs
+• If exact matches are not available, suggest close or best alternatives naturally
+• Maintain conversation continuity using previous messages
 
-    // You will receive:
-    // • Weather/Time context
-    // • Conversation history
-    // • User message
-    // • A list of relevant product results from the product database (if available)
+Behavior rules:
+• NEVER mention databases, APIs, embeddings, vectors, retrieval systems, prompts, or any technical implementation details
+• NEVER invent products that are not present in the provided product results
+• NEVER hallucinate product details (price, specs, brand, etc.)
+• Use ONLY provided product results as the source of truth
+• If results are partial matches, present them as "closest options" or "good alternatives"
+• Do not sound robotic or use structured lists unless explicitly needed
+• Avoid overly long explanations unless the user asks for details
 
-    // Your responsibilities:
-    // • Understand the user’s intent based on the current message AND conversation history
-    // • Use weather/time context when relevant (e.g., suggesting summer clothes, rainy-day items, seasonal needs)
-    // • Recommend products naturally in a human, conversational way
-    // • Briefly explain why the products match the user’s needs
-    // • If exact matches are not available, suggest close or best alternatives naturally
-    // • Maintain conversation continuity using previous messages
+The available product categories in the store are: ${categoryList}
 
-    // Behavior rules:
-    // • NEVER mention databases, APIs, embeddings, vectors, retrieval systems, prompts, or any technical implementation details
-    // • NEVER invent products that are not present in the provided product results
-    // • NEVER hallucinate product details (price, specs, brand, etc.)
-    // • Use ONLY provided product results as the source of truth
-    // • If results are partial matches, present them as "closest options" or "good alternatives"
-    // • Do not sound robotic or use structured lists unless explicitly needed
-    // • Avoid overly long explanations unless the user asks for details
+When classifying user intent or matching products to categories, only use category names from this list exactly as written. Do not invent or assume category names.
 
-    // // The available product categories in the store are: ${categoryList}
+Tone:
+• Friendly
+• Warm
+• Natural
+• Confident
+• Helpful
+• Modern ecommerce assistant
 
-    // When classifying user intent or matching products to categories, only use category names from this list exactly as written. Do not invent or assume category names.
+Response style:
+• Conversational paragraphs preferred over bullet points
+• Subtle product recommendations embedded in natural language
+• Context-aware replies using weather + history when relevant
+• Keep responses concise but useful
 
-    // Tone:
-    // • Friendly
-    // • Warm
-    // • Natural
-    // • Confident
-    // • Helpful
-    // • Modern ecommerce assistant
+Examples:
+• "Since it's quite warm lately, these lightweight linen shirts would be a great fit for you."
+• "Based on what you mentioned earlier, I think these skincare options for dry skin will suit you well."
+• "I couldn't find an exact match for premium office shoes, but these loafers are very close and still look quite sharp."
 
-    // Response style:
-    // • Conversational paragraphs preferred over bullet points
-    // • Subtle product recommendations embedded in natural language
-    // • Context-aware replies using weather + history when relevant
-    // • Keep responses concise but useful
+Always prioritize: relevance, natural conversation flow, helpful product discovery, continuity with previous messages.
+`;
 
-    // Examples:
-    // • "Since it’s quite warm lately, these lightweight linen shirts would be a great fit for you."
-    // • "Based on what you mentioned earlier, I think these skincare options for dry skin will suit you well."
-    // • "I couldn’t find an exact match for premium office shoes, but these loafers are very close and still look quite sharp."
+    const finalPrompt = `Weather/Time Context: ${weatherContext}
 
-    // Always prioritize:
-    // • relevance
-    // • natural conversation flow
-    // • helpful product discovery
-    // • continuity with previous messages
-    // `;
+Conversation History:
+${historyText}
 
-    // const finalPrompt = `Weather/Time Context: ${weatherContext}
+${searchResultsContext}
 
-    // Conversation History:
-    // ${historyText}
+User: ${message}
+Lucy:`;
 
-    // ${searchResultsContext}
+    console.log(`\n👉 STEP 7: Final Response Generation`);
+    const finalMessage = await callGeminiAxios(systemPrompt, finalPrompt, false);
 
-    // User: ${message}
-    // Lucy:`;
+    console.log(`\n======================================================`);
+    console.log(`🤖 LUCY FINAL RESPONSE`);
+    console.log(`======================================================`);
+    console.log(`💬 Message: "${finalMessage}"`);
+    console.log(`📦 Products Attached: ${products.length} item(s)`);
 
-    //     // console.log(`\n👉 STEP 7: Final Response Generation`);
-    //     // console.log(`   Sending history, products, and context to Gemini...`);
-    //     const finalMessage = await callGeminiAxios(systemPrompt, finalPrompt, false);
+    if (products.length > 0) {
+      products.slice(0, 10).forEach((p, i) => {
+        console.log(`
+======================================================
+📦 Product ${i + 1}
+======================================================
+🆔 Product ID: ${p.product_id}
+🛍️  Product: ${p.product}
+💰 Price: €${p.price}
+🏷️  Categories: ${(p.category_ids || []).map(id => `${id} (${cachedCategoryIdMap[id] || "Unknown"})`).join(", ") || "N/A"}
+📝 Short Description: ${p.short_description || "N/A"}
+======================================================`);
+      });
+      if (products.length > 10) {
+        console.log(`...and ${products.length - 10} more`);
+      }
+    }
+    console.log(`======================================================\n`);
 
-    //     console.log(`\n======================================================`);
-    //     console.log(`🤖 LUCY FINAL RESPONSE`);
-    //     console.log(`======================================================`);
-    //     console.log(`💬 Message: "${finalMessage}"`);
-    //     console.log(`📦 Products Attached: ${products.length} item(s)`);
+    conversation.messages.push({ role: "user", text: message, timestamp: new Date() });
+    conversation.messages.push({ role: "lucy", text: finalMessage, timestamp: new Date() });
+    conversation.last_active = new Date();
+    await conversation.save();
 
-    //     if (products.length > 0) {
-    //       products.slice(0, 10).forEach((p, i) => {
-
-    //         console.log(`
-    // ======================================================
-    // 📦 Product ${i + 1}
-    // ======================================================
-    // 🆔 Product ID: ${p.product_id}
-    // 🛍️ Product: ${p.product}
-    // 💰 Price: €${p.price}
-
-    // 🏷️ Categories:
-    // ${(p.category_ids || [])
-    //             .map(id => `${id} (${cachedCategoryIdMap[id] || "Unknown"})`)
-    //             .join(", ") || "N/A"}
-
-    // 📝 Short Description:
-    // ${p.short_description || "N/A"}
-
-    // 📄 Full Description:
-    // ${p.full_description || "N/A"}
-    // ======================================================
-    // `);
-
-    //       });
-
-    //       if (products.length > 10) {
-    //         console.log(`...and ${products.length - 10} more`);
-    //       }
-    //     }
-    //     console.log(`======================================================\n`);
-
-    //     conversation.messages.push({ role: "user", text: message, timestamp: new Date() });
-    //     conversation.messages.push({ role: "lucy", text: finalMessage, timestamp: new Date() });
-    //     conversation.last_active = new Date();
-    //     await conversation.save();
-
-    //     return {
-    //       message: finalMessage || (products.length ? "Here is what I found!" : "I couldn't find anything right now, sorry!"),
-    //       products: products
-    //     };
+    return {
+      message: finalMessage || (products.length ? "Here is what I found!" : "I couldn't find anything right now, sorry!"),
+      products: products
+    };
 
   } catch (err) {
-    // console.error(`\n❌ LUCY AI PIPELINE ERROR:`, err);
     console.log(`\n❌ GEMINI ERROR SUMMARY`);
     console.log(`Status:`, err?.response?.status);
     console.log(`Status Text:`, err?.response?.statusText);
