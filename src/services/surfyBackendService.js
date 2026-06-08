@@ -8,6 +8,7 @@ const { generateEmbedding } = require("../utils/embedding");
 
 const USE_VECTOR_SEARCH = process.env.VECTOR_SEARCH_ENABLED === 'true';
 const VECTOR_SEARCH_THRESHOLD = 0.72;
+const VECTOR_FALLBACK_THRESHOLD = 0.78;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || (config && config.gemini ? config.gemini.apiKey : "");
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
@@ -80,9 +81,9 @@ async function callGeminiAxios(systemInstruction, promptText, expectJson = false
   return text.trim();
 }
 
-async function performVectorSearch(phrase, filters) {
+async function performVectorSearch(phrase, filters, cachedEmbedding = null) {
   console.log(`[SurfyService] Performing vector search for phrase: "${phrase}" with filters:`, filters);
-  const embedding = await generateEmbedding(phrase);
+  const embedding = cachedEmbedding || await generateEmbedding(phrase);
 
   const filterConditions = {};
   if (filters?.price_max != null) {
@@ -117,7 +118,7 @@ async function performVectorSearch(phrase, filters) {
       }
     }
   ];
-  return await Product.aggregate(pipeline);
+  return { results: await Product.aggregate(pipeline), embedding };
 }
 
 async function getRelevantCategories(message) {
@@ -165,7 +166,15 @@ Examples:
 - "beach outfit" → yes
 - "dress for a party" → no
 - "leather handbag" → no
-- "jacket for the cold" → yes`;
+- "jacket for the cold" → yes
+- "something for travel" → no
+- "what can I wear tonight" → no
+- "what should I wear" → no
+- "outfit for tonight" → no
+- "show me something nice" → no
+- "I need a gift" → no
+- "bracelet" → no
+- "bag for everyday use" → no`;
 
     const result = await callGeminiAxios(null, prompt, false);
     const answer = result?.toLowerCase().trim();
@@ -196,7 +205,9 @@ async function buildEnhancePrompt(searchPhrase, originalMessage, weatherContext)
 Original query: "${searchPhrase}"${weatherHint}
 
 Rules:
-- Only add product-specific attributes such as: material (cotton, linen, leather, wool, denim), fit (slim, loose, oversized, tailored), style (formal, casual, sporty, elegant), or gender (mens, womens, unisex) — but ONLY when clearly implied by the query
+- Only add product-specific attributes such as: material (cotton, linen, leather, wool, denim), fit (slim, loose, oversized, tailored), or style (formal, casual, sporty, elegant) — but ONLY when clearly implied by the query
+- Do NOT add gender words (mens, womens, unisex) unless the user explicitly stated gender in their message (e.g. "for men", "women's", "ladies", "for him", "for her")
+- If the query has no specific product noun (e.g. "something for travel", "what can I wear"), return the search phrase exactly as given — do not add any words
 - Do NOT add weather words (warm, cool, summer, lightweight, breathable) UNLESS the user explicitly mentioned weather in their message
 - Do NOT add location names (Malta, Mediterranean, etc.)
 - Do NOT add lifestyle or generic marketing words (gift, fashion, trendy, accessories, stylish, popular)
@@ -205,12 +216,35 @@ Rules:
 - Return ONLY the enhanced search string — no explanation, no quotes, no extra text
 
 Examples of correct behaviour:
-- "white shirt" → white shirt formal casual mens
-- "running shoes" → running shoes athletic sport mens womens
-- "dress for a party" → party dress womens evening formal
-- "leather handbag" → leather handbag womens shoulder tote
-- "warm jacket" (user said warm) → warm jacket winter coat heavyweight mens womens
-- "sunglasses" → sunglasses polarized UV protection mens womens`;
+
+Clothing:
+- "white shirt" → white shirt formal casual cotton
+- "linen shirt" → linen shirt casual lightweight
+- "mens white shirt" → mens white shirt formal casual cotton
+
+Footwear:
+- "running shoes" → running shoes athletic sport sneakers trainers
+- "formal black shoes" → formal shoes leather oxford dress
+
+Jewellery:
+- "bracelet" → bracelet jewellery gold silver charm bangle
+- "necklace" → necklace jewellery gold silver pendant chain
+
+Bags:
+- "leather handbag" → leather handbag shoulder tote structured
+- "backpack" → backpack bag casual daypack
+
+Weather-triggered (only when user explicitly mentioned weather):
+- "warm jacket" (user said warm) → warm jacket winter coat heavyweight insulated
+
+No product noun — return unchanged:
+- "something for travel" → something for travel
+- "what can I wear" → what can I wear
+- "something nice" → something nice
+
+Occasion with product noun:
+- "dress for a party" → party dress evening cocktail formal
+- "shoes for a wedding" → wedding shoes formal court`;
 }
 
 
@@ -345,12 +379,12 @@ Output format:
       .replace(/```/g, "")
       .trim();
 
-    let rerankedCategories = [];
+    let rerankedCategories = relevantCategories; // safe fallback: use raw retrieved categories
 
     try {
       rerankedCategories = JSON.parse(cleanedResponse);
     } catch (err) {
-      console.error("Failed to parse reranked categories:", err);
+      console.error("Failed to parse reranked categories — falling back to raw retrieved categories:", err);
     }
 
 
@@ -369,27 +403,73 @@ ${rerankedCategories
 Task:
 
 1. Classify intent:
-   - product_search
-   - advice
+   - product_search — user wants to find or buy a specific product
+   - advice — user wants recommendations, suggestions, guidance, or information
 
-   2. If intent is "product_search":
-   - Extract a clean search_phrase that best represents what the user wants to buy.
+2. Determine needs_products (true or false):
+   - Set to true if the user expects to SEE product suggestions or recommendations
+   - Set to false if the user is asking for information, care tips, how-to guidance, or general knowledge
+   - When intent is "product_search", always set needs_products to true
+   - When intent is "advice", decide based on user expectation:
+     * Does the user want to be SHOWN items? → true
+     * Does the user want INFORMATION about items? → false
+   - Default to true if ambiguous
+
+3. If needs_products is true:
+   - Extract a clean search_phrase representing what products to retrieve.
    - Focus only on the core product intent.
    - Remove conversational words and filler text.
+   - For occasion-based queries, include the occasion and product type.
 
-3. Extract filters if explicitly mentioned:
+4. If needs_products is false:
+   - Set search_phrase to null.
+
+5. Extract filters if explicitly mentioned:
    - price_max
 
 Rules:
 
 - search_phrase should be concise and product-focused.
-- Remove phrases like:
+- Remove conversational filler prefixes like:
   "I need",
   "show me",
   "looking for",
   "can you suggest",
   "something for",
   etc.
+- Remove personal-reference suffixes like:
+  "for my friend",
+  "for her",
+  "for him",
+  "for someone",
+  "for my wife",
+  "for my husband",
+  "for my partner",
+  "as a gift"
+  — keep only the product noun itself.
+
+Examples of correct phrase extraction:
+- "show me a gift for my friend" → gift
+- "something for my husband" → gift
+- "I need a present for her" → present
+- "suggest office wear for women" → office wear
+
+Examples of needs_products classification:
+
+needs_products: true (user wants to SEE products):
+- "what can I wear tonight" → intent: advice, needs_products: true, search_phrase: "evening wear outfit"
+- "suggest office wear" → intent: advice, needs_products: true, search_phrase: "office wear formal"
+- "what should I wear for a party" → intent: advice, needs_products: true, search_phrase: "party wear outfit"
+- "suggest a gift for my friend" → intent: advice, needs_products: true, search_phrase: "gift"
+- "what goes well with jeans" → intent: advice, needs_products: true, search_phrase: "tops casual wear"
+- "recommend something for the beach" → intent: advice, needs_products: true, search_phrase: "beachwear swimwear"
+
+needs_products: false (user wants INFORMATION only):
+- "how do I clean leather shoes" → intent: advice, needs_products: false, search_phrase: null
+- "how to wash cotton clothes" → intent: advice, needs_products: false, search_phrase: null
+- "how to style a bracelet" → intent: advice, needs_products: false, search_phrase: null
+- "what is the difference between gold and silver jewellery" → intent: advice, needs_products: false, search_phrase: null
+- "care tips for leather bags" → intent: advice, needs_products: false, search_phrase: null
 
 - Do NOT include category names unless they are part of the product itself.
 - Do NOT invent products, categories, brands, genders, colors, materials, occasions, or attributes not mentioned by the user.
@@ -404,6 +484,7 @@ Return format:
 {
   "intent": "product_search",
   "search_phrase": "...",
+  "needs_products": true,
   "filters": {
     "price_max": null
   }
@@ -411,51 +492,52 @@ Return format:
 `;
 
     const intentData = await callGeminiAxios("You are an intent classifier for a retail chatbot.", intentPrompt, true);
-    console.log(`   Result: Intent determined as "${intentData?.intent}" with phrase: "${intentData?.search_phrase}"`);
+
+    // Hardcode needs_products for product_search; respect LLM decision for advice
+    if (intentData) {
+      if (intentData.intent === "product_search") {
+        intentData.needs_products = true;
+      }
+      if (intentData.needs_products == null) {
+        intentData.needs_products = intentData.intent === "product_search";
+      }
+    }
+
+    console.log(`   Result: Intent determined as "${intentData?.intent}" | needs_products: ${intentData?.needs_products} | phrase: "${intentData?.search_phrase}"`);
     let products = [];
+    let isFallback = false;
     let searchResultsContext = "";
 
-    if (intentData && intentData.intent === "product_search") {
+    if (intentData && intentData.needs_products && intentData.search_phrase) {
 
-      console.log(`\n STEP 4: Search Phrase Enhancement (Task 2a)`);
+      console.log(`\n👉 STEP 4: Search Phrase Enhancement`);
       const weatherDetectedForLog = await userMentionedWeather(message);
       console.log(`   Weather mentioned by user: ${weatherDetectedForLog}`);
-      const enhancePrompt = await buildEnhancePrompt(
+      const enhancePromptStr = await buildEnhancePrompt(
         intentData.search_phrase || message,
         message,
         weatherContext
       );
-      const enhancedPhrase = await callGeminiAxios(null, enhancePrompt, false);
+      const enhancedPhrase = await callGeminiAxios(null, enhancePromptStr, false);
       console.log(`   Result enhancedPhrase: "${enhancedPhrase}"`);
 
-      console.log(`\n STEP 5: MongoDB Vector Search`);
+      console.log(`\n👉 STEP 5: MongoDB Vector Search`);
       const categoryIds = rerankedCategories.map(c => c.category_id);
-      let searchResults = await performVectorSearch(enhancedPhrase,
-        {
-          ...intentData.filters,
-          category_ids: categoryIds
-        }
-      );
-
-      // For debugging: added a fetch all categories to create a lookup map for better log output
-      const allCategories = await Category.find(
-        {},
-        {
-          category_id: 1,
-          category: 1
-        }
-      ).lean();
-      const categoryLookup = {};
-
-      allCategories.forEach(cat => {
-        categoryLookup[cat.category_id] = cat.category;
+      if (categoryIds.length === 0) {
+        console.warn(`   [SurfyService] Warning: no category IDs available — running vector search without category filter.`);
+      }
+      const primarySearch = await performVectorSearch(enhancedPhrase, {
+        ...intentData.filters,
+        category_ids: categoryIds
       });
-      // console.log(
-      //   searchResults.map(p => ({
-      //     product: p.product,
-      //     categories: p.category_ids
-      //   }))
-      // );
+      let searchResults = primarySearch.results;
+      const cachedEmbedding = primarySearch.embedding;
+      console.log(`   Result: ${searchResults.length} raw vector search results.`);
+
+      // Category lookup map for debug logging
+      const allCategories = await Category.find({}, { category_id: 1, category: 1 }).lean();
+      const categoryLookup = {};
+      allCategories.forEach(cat => { categoryLookup[cat.category_id] = cat.category; });
       console.table(
         searchResults.map(product => ({
           product_id: product.product_id,
@@ -467,153 +549,144 @@ Return format:
         }))
       );
 
+      console.log(`\n👉 STEP 6: Applying Score Threshold & Fetching Full Products`);
+      let aboveThreshold = searchResults.filter(r => r.score >= VECTOR_SEARCH_THRESHOLD);
+      console.log(`   ${aboveThreshold.length}/${searchResults.length} products above threshold (${VECTOR_SEARCH_THRESHOLD})`);
 
-      //   if (searchResults.length > 0 && searchResults[0].score < VECTOR_SEARCH_THRESHOLD) {
-      //     console.log(`    Top score (${searchResults[0].score}) is below threshold (${VECTOR_SEARCH_THRESHOLD}).`);
-      //     console.log(`    Retrying search with broader phrase...`);
-      //     const retryPrompt = `The previous search phrase "${enhancedPhrase}" yielded poor results. Write a broader, more general product search phrase for: "${message}". Return only the string without quotes.`;
-      //     const broaderPhrase = await callGeminiAxios(null, retryPrompt, false);
-      //     console.log(`   Result broader phrase: "${broaderPhrase}"`);
-      //     searchResults = await performVectorSearch(broaderPhrase, intentData.filters);
-      //   }
+      // ── Step 6b: Fallback — unfiltered vector search ────────────────────────
+      if (aboveThreshold.length === 0 && categoryIds.length > 0) {
+        console.log(`\n👉 STEP 6b: FALLBACK — Running unfiltered vector search (reusing cached embedding)`);
+        const fallbackSearch = await performVectorSearch(enhancedPhrase, {
+          ...intentData.filters,
+          category_ids: []   // no category filter
+        }, cachedEmbedding);
+        const fallbackResults = fallbackSearch.results;
+        console.log(`   Fallback raw results: ${fallbackResults.length}`);
+        console.table(
+          fallbackResults.map(product => ({
+            product_id: product.product_id,
+            name: product.product,
+            score: product.score,
+            categories: product.category_ids
+              ?.map(id => `${id} (${categoryLookup[id] || "Unknown"})`)
+              .join(", ")
+          }))
+        );
 
-      //   if (searchResults.length > 0) {
-      //     console.log(`   Result: Found ${searchResults.length} matching products. Top score: ${searchResults[0].score}`);
-      //     const productIds = searchResults.map(r => r.product_id);
-      //     products = await Product.find({ product_id: { $in: productIds } })
-      //       .select('-embedding')
-      //       .lean();
+        aboveThreshold = fallbackResults.filter(r => r.score >= VECTOR_FALLBACK_THRESHOLD);
+        console.log(`   Fallback above threshold (${VECTOR_FALLBACK_THRESHOLD}): ${aboveThreshold.length}/${fallbackResults.length}`);
 
-      //     products.sort((a, b) => productIds.indexOf(a.product_id) - productIds.indexOf(b.product_id));
+        if (aboveThreshold.length > 0) {
+          isFallback = true;
+          searchResults = fallbackResults;
+          console.log(`   ⚠️ FALLBACK ACTIVATED — serving ${aboveThreshold.length} unfiltered result(s)`);
+        } else {
+          console.log(`   Fallback also returned no products above threshold.`);
+        }
+      }
 
-      //     products = products.map(p => ({
-      //       ...p,
-      //       format_price: p.price ? `€${Number(p.price).toFixed(2)}` : "€0.00",
-      //       format_list_price: p.list_price ? `€${Number(p.list_price).toFixed(2)}` : undefined,
-      //       discount_prc: p.list_price && p.price < p.list_price
-      //         ? ((p.list_price - p.price) / p.list_price) * 100
-      //         : undefined,
-      //       main_pair: p.main_pair || null
-      //     }));
+      if (aboveThreshold.length > 0) {
+        const productIds = aboveThreshold.map(r => r.product_id);
+        products = await Product.find({ product_id: { $in: productIds } })
+          .select('-embedding')
+          .lean();
 
-      //     searchResultsContext = "Product search results:\n" + products.slice(0, 5).map(p => `- ${p.product} (Price: €${p.price})`).join("\n");
-      //   } else {
-      //     console.log(`   Result: No products found.`);
-      //     searchResultsContext = "No products found for this request.";
-      //   }
-      // }
+        // Preserve vector search rank order
+        products.sort((a, b) => productIds.indexOf(a.product_id) - productIds.indexOf(b.product_id));
 
-      // console.log(`\n STEP 6: Fetching Conversation History`);
-      // let conversation = await Conversation.findOne({ session_id });
-      // if (!conversation) {
-      //   conversation = new Conversation({ session_id, messages: [] });
-      // }
-      // const history = conversation.messages.slice(-8);
-      // console.log(`   Result: Retrieved ${history.length} previous messages for context.`);
-      // const historyText = history.length > 0
-      //   ? history.map(m => `${m.role === 'user' ? 'User' : 'Lucy'}: ${m.text}`).join("\n")
-      //   : "No previous conversation.";
+        // Price enrichment
+        products = products.map(p => ({
+          ...p,
+          format_price: p.price ? `€${Number(p.price).toFixed(2)}` : "€0.00",
+          format_list_price: p.list_price ? `€${Number(p.list_price).toFixed(2)}` : undefined,
+          discount_prc: p.list_price && p.price < p.list_price
+            ? Math.round(((p.list_price - p.price) / p.list_price) * 100)
+            : undefined,
+          main_pair: p.main_pair || null
+        }));
 
-      //     const systemPrompt = `
-      // You are Lucy, the AI shopping assistant for Surf Malta.
+        const resultLabel = isFallback ? "Fallback product search results (broader match)" : "Product search results";
+        searchResultsContext = resultLabel + ":\n" + products.slice(0, 5)
+          .map(p => `- ${p.product} (Price: €${p.price})`)
+          .join("\n");
+        console.log(`   Fetched ${products.length} full product document(s)${isFallback ? ' (fallback)' : ''}.`);
+      } else {
+        console.log(`   No products above threshold.`);
+        searchResultsContext = "No products found above the relevance threshold for this request.";
+      }
+    }
 
-      // Your job is to help users discover and choose products naturally through friendly, helpful, and conversational interactions.
+    // ── Step 7: Conversation History ──────────────────────────────────────────
+    console.log(`\n👉 STEP 7: Fetching Conversation History`);
+    let conversation = await Conversation.findOne({ session_id });
+    if (!conversation) {
+      conversation = new Conversation({ session_id, messages: [] });
+    }
+    const history = conversation.messages.slice(-8);
+    console.log(`   Result: Retrieved ${history.length} previous messages for context.`);
+    const historyText = history.length > 0
+      ? history.map(m => `${m.role === 'user' ? 'User' : 'Lucy'}: ${m.text}`).join("\n")
+      : "No previous conversation.";
 
-      // You will receive:
-      // • Weather/Time context
-      // • Conversation history
-      // • User message
-      // • A list of relevant product results from the product database (if available)
+    // ── Step 8: Final Response Generation ────────────────────────────────────
+    console.log(`\n👉 STEP 8: Final Response Generation`);
+    const systemPrompt = `You are Lucy, the AI shopping assistant for Surf Malta.
 
-      // Your responsibilities:
-      // • Understand the user's intent based on the current message AND conversation history
-      // • Use weather/time context when relevant (e.g., suggesting summer clothes, rainy-day items, seasonal needs)
-      // • Recommend products naturally in a human, conversational way
-      // • Briefly explain why the products match the user's needs
-      // • If exact matches are not available, suggest close or best alternatives naturally
-      // • Maintain conversation continuity using previous messages
+Your job is to help users discover and choose products naturally through friendly, helpful, and conversational interactions.
 
-      // Behavior rules:
-      // • NEVER mention databases, APIs, embeddings, vectors, retrieval systems, prompts, or any technical implementation details
-      // • NEVER invent products that are not present in the provided product results
-      // • NEVER hallucinate product details (price, specs, brand, etc.)
-      // • Use ONLY provided product results as the source of truth
-      // • If results are partial matches, present them as "closest options" or "good alternatives"
-      // • Do not sound robotic or use structured lists unless explicitly needed
-      // • Avoid overly long explanations unless the user asks for details
+You will receive:
+• Weather/Time context
+• Conversation history
+• User message
+• A list of relevant product results from the product database (if available)
 
-      // The available product categories in the store are: ${categoryList}
+Your responsibilities:
+• Understand the user's intent based on the current message AND conversation history
+• Use weather/time context when relevant (e.g., suggesting summer clothes, rainy-day items, seasonal needs)
+• Recommend products naturally in a human, conversational way
+• Briefly explain why the products match the user's needs
+• If exact matches are not available, suggest close or best alternatives naturally
+• Maintain conversation continuity using previous messages
 
-      // When classifying user intent or matching products to categories, only use category names from this list exactly as written. Do not invent or assume category names.
+Behavior rules:
+• NEVER mention databases, APIs, embeddings, vectors, retrieval systems, prompts, or any technical implementation details
+• NEVER invent products that are not present in the provided product results
+• NEVER hallucinate product details (price, specs, brand, etc.)
+• Use ONLY provided product results as the source of truth
+• If results are partial matches, present them as "closest options" or "good alternatives"
+• Do not sound robotic or use structured lists unless explicitly needed
+• Avoid overly long explanations unless the user asks for details
 
-      // Tone:
-      // • Friendly
-      // • Warm
-      // • Natural
-      // • Confident
-      // • Helpful
-      // • Modern ecommerce assistant
+Tone: Friendly, warm, natural, confident, helpful, modern ecommerce assistant
 
-      // Response style:
-      // • Conversational paragraphs preferred over bullet points
-      // • Subtle product recommendations embedded in natural language
-      // • Context-aware replies using weather + history when relevant
-      // • Keep responses concise but useful
+Response style:
+• Conversational paragraphs preferred over bullet points
+• Subtle product recommendations embedded in natural language
+• Context-aware replies using weather + history when relevant
+• Keep responses concise but useful`;
 
-      // Examples:
-      // • "Since it's quite warm lately, these lightweight linen shirts would be a great fit for you."
-      // • "Based on what you mentioned earlier, I think these skincare options for dry skin will suit you well."
-      // • "I couldn't find an exact match for premium office shoes, but these loafers are very close and still look quite sharp."
+    const finalPrompt = `Weather/Time Context: ${weatherContext}\n\nConversation History:\n${historyText}\n\n${searchResultsContext || "No product search performed."}\n\nUser: ${message}\nLucy:`;
 
-      // Always prioritize: relevance, natural conversation flow, helpful product discovery, continuity with previous messages.
-      // `;
+    const finalMessage = await callGeminiAxios(systemPrompt, finalPrompt, false);
+    console.log(`   Result: Response generated (${finalMessage?.length || 0} chars).`);
 
-      //     const finalPrompt = `Weather/Time Context: ${weatherContext}
+    // ── Step 9: Save Conversation ─────────────────────────────────────────────
+    conversation.messages.push({ role: "user", text: message, timestamp: new Date() });
+    conversation.messages.push({ role: "lucy", text: finalMessage || "", timestamp: new Date() });
+    conversation.last_active = new Date();
+    await conversation.save();
 
-      // Conversation History:
-      // ${historyText}
+    console.log(`\n======================================================`);
+    console.log(`🤖 LUCY FINAL RESPONSE`);
+    console.log(`======================================================`);
+    console.log(`💬 Message: "${finalMessage}"`);
+    console.log(`📦 Products Attached: ${products.length} item(s)${isFallback ? ' (FALLBACK)' : ''}`);
+    console.log(`======================================================\n`);
 
-      // ${searchResultsContext}
-
-      // User: ${message}
-      // Lucy:`;
-
-      //     console.log(`\n👉 STEP 7: Final Response Generation`);
-      //     const finalMessage = await callGeminiAxios(systemPrompt, finalPrompt, false);
-
-      //     console.log(`\n======================================================`);
-      //     console.log(`🤖 LUCY FINAL RESPONSE`);
-      //     console.log(`======================================================`);
-      //     console.log(`💬 Message: "${finalMessage}"`);
-      //     console.log(`📦 Products Attached: ${products.length} item(s)`);
-
-      //     if (products.length > 0) {
-      //       products.slice(0, 10).forEach((p, i) => {
-      //         console.log(`
-      // ======================================================
-      // 📦 Product ${i + 1}
-      // ======================================================
-      // 🆔 Product ID: ${p.product_id}
-      // 🛍️  Product: ${p.product}
-      // 💰 Price: €${p.price}
-      // 🏷️  Categories: ${(p.category_ids || []).map(id => `${id} (${cachedCategoryIdMap[id] || "Unknown"})`).join(", ") || "N/A"}
-      // 📝 Short Description: ${p.short_description || "N/A"}
-      // ======================================================`);
-      //       });
-      //       if (products.length > 10) {
-      //         console.log(`...and ${products.length - 10} more`);
-      //       }
-      //     }
-      //     console.log(`======================================================\n`);
-
-      //     conversation.messages.push({ role: "user", text: message, timestamp: new Date() });
-      //     conversation.messages.push({ role: "lucy", text: finalMessage, timestamp: new Date() });
-      //     conversation.last_active = new Date();
-      //     await conversation.save();
-
-      // return {
-      //   message: finalMessage || (products.length ? "Here is what I found!" : "I couldn't find anything right now, sorry!"),
-      //   products: products
+    return {
+      message: finalMessage || (products.length ? "Here is what I found!" : "I couldn't find anything right now, sorry!"),
+      products: products,
+      isFallback
     };
 
   } catch (err) {
