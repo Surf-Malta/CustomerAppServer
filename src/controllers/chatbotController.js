@@ -1,21 +1,22 @@
 const surfyService = require("../services/surfyBackendService");
+const { rewriteImageUrls } = require("../utils/cdnParser");
 
 exports.handleChat = async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, user_id } = req.body;
     if (!message) {
       return res
         .status(400)
         .json({ status: "error", message: "Message is required" });
     }
 
-    console.log(`[Chatbot] Processing: "${message}"`);
-    const result = await surfyService.processChat(message);
+    console.log(`[Chatbot] Processing: "${message}" for session: "${user_id || "default"}"`);
+    const result = await surfyService.processChat(message, user_id || "default");
 
     //product response
     res.status(200).json({
       message: result.message,
-      products: result.products,
+      products: rewriteImageUrls(result.products),
       status: "success",
     });
 

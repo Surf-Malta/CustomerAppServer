@@ -46,11 +46,15 @@ async function fetchCategoryNames(categoryIds = []) {
 }
 
 async function generateEmbedding(text) {
+    if (!text || typeof text !== 'string' || !text.trim()) {
+        console.warn("[Embedding] generateEmbedding received empty or invalid text, returning zero vector.");
+        return new Array(768).fill(0);
+    }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${process.env.GEMINI_API_KEY}`;
 
     const response = await axios.post(url, {
         content: {
-            parts: [{ text }]
+            parts: [{ text: text.trim() }]
         }
     });
 

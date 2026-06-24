@@ -122,6 +122,10 @@ async function performVectorSearch(phrase, filters, cachedEmbedding = null) {
 }
 
 async function getRelevantCategories(message) {
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    console.log("[SurfyService] getRelevantCategories: message is empty, returning empty categories.");
+    return [];
+  }
   const embedding = await generateEmbedding(message);
 
   const pipeline = [
@@ -593,6 +597,29 @@ Return format:
 
         // Preserve vector search rank order
         products.sort((a, b) => productIds.indexOf(a.product_id) - productIds.indexOf(b.product_id));
+
+        // Enrich products from CS-Cart in parallel to get correct IDs and images
+        products = await Promise.all(products.map(async (p) => {
+          try {
+            const searchQuery = p.product;
+            const res = await searchProductsNative(searchQuery);
+            const realProducts = res?.products || [];
+            const realProduct = realProducts.find(rp => rp.product?.toLowerCase() === p.product?.toLowerCase()) || realProducts[0];
+            if (realProduct) {
+              console.log(`[Enrichment] Mapped MongoDB ID ${p.product_id} -> CS-Cart ID ${realProduct.product_id} for "${p.product}"`);
+              return {
+                ...p,
+                product_id: Number(realProduct.product_id),
+                main_pair: realProduct.main_pair || null,
+                image_url: realProduct.image_url || null,
+                price: realProduct.price || p.price
+              };
+            }
+          } catch (err) {
+            console.error(`[Enrichment] Failed to enrich product "${p.product}":`, err.message);
+          }
+          return p;
+        }));
 
         // Price enrichment
         products = products.map(p => ({
